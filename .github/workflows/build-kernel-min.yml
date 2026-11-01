@@ -173,6 +173,15 @@ jobs:
           done
           ls -l "$OUT/tree/build/native-prelink/"
 
+          # scripts/xnu_symbols.py prefers this checkpoint over nm-ing the target tree's objects
+          # ("Names of the XNU kernel alone"). Pass 1's kernel is exactly that: a linked 4 KiB XNU with
+          # none of this tree's archives in it. Under format 2 the archive builders run before the target
+          # tree has ever linked, and build-xnu-4k-baseline.sh deletes startup.o whenever a per-object
+          # compile flag changes, so the object set there is not a reliable symbol source.
+          mkdir -p "$OUT/tree/build/xnu/checkpoints/native-4k-user-abi"
+          cp "$UKE_BS_DIR/kernel/kernel.macho" "$OUT/tree/build/xnu/checkpoints/native-4k-user-abi/kernel.macho"
+          ls -l "$OUT/tree/build/xnu/checkpoints/native-4k-user-abi/"
+
       # A configuration without CONFIG_XNU_BUILD_ARCHIVES (uke_defconfig) links without the archives the
       # driver would otherwise build, so this pass stops at the link — on purpose. What it leaves behind
       # is what the archive builders need: build/xnu/ios-obj/... (EXPORT_HDRS and the compile records).
