@@ -1,21 +1,15 @@
 diff --git a/osfmk/kern/debug.c b/osfmk/kern/debug.c
-index e9daeed..a007b4e 100644
 --- a/osfmk/kern/debug.c
 +++ b/osfmk/kern/debug.c
-@@ -1165,6 +1165,27 @@ panic_trap_to_debugger(const char *panic_format_str, va_list *panic_args, unsign
+@@ -1163,9 +1163,23 @@
+ 	}
+ 
  	/* Turn off I/O tracing once we've panicked */
  	iotrace_disable();
  
-+	/* Only reached when the payload leaves this funnel alone: the panic screen
-+	 * redirects it and stages the text itself. Stage the title for the next boot.
-+	 *
-+	 * uke_panic_flush lives in libUkeLastLog.a, which scripts/build-boot-log.py
-+	 * compiles against this kernel's own compile records — so the archive cannot
-+	 * exist while the bootstrap pass links, and configurations that leave
-+	 * XNU_WATCHDOG_POLICY at 0 never link it at all. Guard the call on the macro
-+	 * the build driver always defines, or the link fails with
-+	 * "undefined symbol: _uke_panic_flush" on a cold tree. */
 +#if XNU_WATCHDOG_POLICY
++	/* Only reached when the payload leaves this funnel alone: the panic screen
++	 * redirects it and stages the text itself. Stage the title for the next boot. */
 +	{
 +		extern void uke_panic_flush(const char *);
 +		char uke_panic_text[512];
@@ -30,13 +24,11 @@ index e9daeed..a007b4e 100644
  	/* call machine-layer panic handler */
  	ml_panic_trap_to_debugger(panic_format_str, panic_args, reason, ctx, panic_options_mask, panic_caller);
  
+ 	/* track depth of debugger/panic entry */
 diff --git a/pexpert/arm/pe_init.c b/pexpert/arm/pe_init.c
-index 433b6cd..387790e 100644
 --- a/pexpert/arm/pe_init.c
 +++ b/pexpert/arm/pe_init.c
-@@ -164,6 +164,11 @@ check_for_panic_log(void)
- #endif /* DEVELOPMENT && defined(XNU_TARGET_OS_BRIDGE) */
- 
+@@ -188,3 +188,8 @@
  #endif
 +	/* A panic-time staging block (UkeLastLog's UKE_PANIC_SAVE_MAGIC) is consumed
 +	 * by the log writer: keep it instead of clearing the pram. */
@@ -45,4 +37,3 @@ index 433b6cd..387790e 100644
 +	}
  	panic_info = (struct embedded_panic_header *)gPanicBase;
  
- 	/* Check if a shared memory console is running in the panic buffer */
