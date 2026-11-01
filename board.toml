@@ -74,16 +74,26 @@ archives = [
   "build-mockfs-fixture.py",
   "build-sheng-platform-power.py",
   "build-libpthread-kernel.py",
-  "prepare-uke-gmu.py",
-  "component:Adreno740",
-  "build-native-adreno-kits.py",
-  "build-adreno740-accelerator.py",
   "component:ShengHidInput",
   "component:AppleKeyStoreState",
-  "build-native-legacy-display.py",
-  # The addon blob packs the owner-built Metal plugin bundle; the script builds
-  # it (and the owner trust module that admits it) when it is not on disk yet.
-  "build-gpu-addon-blob.py",
+  # --- not runnable on a public runner; re-enable when the inputs exist -------------------------
+  # Kept visible instead of deleted so the full build's shape stays readable.
+  #
+  #   prepare-uke-gmu.py / component:Adreno740 / build-native-adreno-kits.py /
+  #   build-adreno740-accelerator.py
+  #       need the A732 GPU firmware pins in .cache/firmware/uke-gpu (extracted from the device's
+  #       /vendor/firmware_mnt/image and /odm/firmware — see proprietary-files.txt).
+  #   build-native-legacy-display.py
+  #       gated by audit-mobile-graphics-legacy.py against a previously qualified candidate.
+  #   build-gpu-addon-blob.py
+  #       packs the owner-built Metal plug-in bundle, which no clean tree has.
+  #
+  # "prepare-uke-gmu.py",
+  # "component:Adreno740",
+  # "build-native-adreno-kits.py",
+  # "build-adreno740-accelerator.py",
+  # "build-native-legacy-display.py",
+  # "build-gpu-addon-blob.py",
   "build-boot-log.py",
 ]
 

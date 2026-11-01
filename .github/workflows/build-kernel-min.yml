@@ -29,6 +29,7 @@ on:
         options:
           - uke_defconfig
           - uke-nodisplay_defconfig
+          - uke-storage_defconfig
           - uke-full_defconfig
       core_repository:
         description: 'Core UniXNU repository (owner/name)'
@@ -232,7 +233,7 @@ jobs:
       # is what the archive builders need: build/xnu/ios-obj/... (EXPORT_HDRS and the compile records).
       # The separate bootstrap config's tree cannot provide them: format 2 gives every config its own tree.
       - name: Pass 2 — compile records inside the target tree (link expected to fail)
-        if: inputs.defconfig != 'uke-full_defconfig'
+        if: contains(fromJSON('["uke_defconfig","uke-nodisplay_defconfig"]'), inputs.defconfig)
         working-directory: UniXNU
         run: |
           set -x
@@ -247,7 +248,7 @@ jobs:
       # The first-console configuration does not opt in to the board archive list, so its archives are
       # built here explicitly, in the same tree as the records from pass 2.
       - name: Build the first-console archives
-        if: inputs.defconfig != 'uke-full_defconfig'
+        if: contains(fromJSON('["uke_defconfig","uke-nodisplay_defconfig"]'), inputs.defconfig)
         working-directory: UniXNU
         run: |
           set -x
