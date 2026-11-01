@@ -126,6 +126,40 @@ jobs:
           git -C UniXNU-sm7675-common checkout -q "$sha"
           git -C UniXNU-sm7675-common log -1 --format='%h %s'
 
+      # Build-environment shim, not a source change. The archive recipes hardcode clang warning names
+      # and compile with -Werror, so a name the runner's clang no longer knows is fatal:
+      #   error: unknown warning option '-Wno-unused-but-set-global'; did you mean
+      #          '-Wno-unused-but-set-variable'? [-Werror,-Wunknown-warning-option]
+      # The runner now ships Xcode 26.6 with Homebrew clang 23.1.4, newer than the toolchain these
+      # recipes were written against. '-Wno-unknown-warning-option' makes the compiler ignore any
+      # warning name it does not recognise, which is exactly the drift to absorb. Idempotent, and the
+      # log prints the patched line so a reviewer can see it.
+      # Upstream fix: put the flag in the core's recipe lists so no workflow needs this step.
+      - name: Tolerate newer clang warning names in the archive recipes
+        run: |
+          set -x
+          python3 - <<'PY'
+          import pathlib
+          targets = ['UniXNU/scripts/build-arm-driver.py',
+                     'UniXNU-uke/scripts/build-native-legacy-display.py']
+          for name in targets:
+              p = pathlib.Path(name)
+              if not p.is_file():
+                  print('skipped (absent):', name)
+                  continue
+              s = p.read_text()
+              if '-Wno-unknown-warning-option' in s:
+                  print('already patched:', name)
+                  continue
+              anchor = "'-Wno-unused-parameter'"
+              if anchor not in s:
+                  print('anchor not found, left alone:', name)
+                  continue
+              p.write_text(s.replace(anchor, anchor + ", '-Wno-unknown-warning-option'", 1))
+              print('patched:', name)
+          PY
+          grep -n "unknown-warning-option" UniXNU/scripts/build-arm-driver.py UniXNU-uke/scripts/build-native-legacy-display.py || true
+
       - name: Fetch the Apple references
         working-directory: UniXNU
         run: |
