@@ -22,12 +22,13 @@ on:
   workflow_dispatch:
     inputs:
       defconfig:
-        description: 'Device defconfig to build'
+        description: 'Device defconfig to build (uke-nodisplay skips the audit-gated display archive)'
         required: true
         default: 'uke_defconfig'
         type: choice
         options:
           - uke_defconfig
+          - uke-nodisplay_defconfig
           - uke-full_defconfig
       core_repository:
         description: 'Core UniXNU repository (owner/name)'
@@ -231,7 +232,7 @@ jobs:
       # is what the archive builders need: build/xnu/ios-obj/... (EXPORT_HDRS and the compile records).
       # The separate bootstrap config's tree cannot provide them: format 2 gives every config its own tree.
       - name: Pass 2 — compile records inside the target tree (link expected to fail)
-        if: inputs.defconfig == 'uke_defconfig'
+        if: inputs.defconfig != 'uke-full_defconfig'
         working-directory: UniXNU
         run: |
           set -x
@@ -246,7 +247,7 @@ jobs:
       # The first-console configuration does not opt in to the board archive list, so its archives are
       # built here explicitly, in the same tree as the records from pass 2.
       - name: Build the first-console archives
-        if: inputs.defconfig == 'uke_defconfig'
+        if: inputs.defconfig != 'uke-full_defconfig'
         working-directory: UniXNU
         run: |
           set -x
@@ -256,8 +257,14 @@ jobs:
           ( cd "$workspace" && python3 scripts/build-corecrypto-14.py --namespace )
           ( cd "$workspace" && python3 scripts/build-arm-driver.py ArmDTPlatform )
           ( cd "$workspace" && python3 scripts/build-arm-driver.py ArmCpu )
-          mkdir -p "$workspace/build/display-analysis"
-          UKE_OUT_DIR="$UKE_OUT_DIR" python3 - <<'PY2'
+          # The legacy display archive is gated by audit-mobile-graphics-legacy.py, which only accepts a
+          # candidate whose recorded original IOMobileFramebufferLegacy executable matches a previously
+          # qualified baseline. uke_defconfig wants it; uke-nodisplay_defconfig deliberately does not, and
+          # build-xnu-4k-baseline.sh inserts uke_display_probe_stub into bsd/init.c instead, so the link
+          # succeeds without it.
+          if [ "${{ inputs.defconfig }}" = "uke_defconfig" ]; then
+            mkdir -p "$workspace/build/display-analysis"
+            UKE_OUT_DIR="$UKE_OUT_DIR" python3 - <<'PY2'
           import json, os
           from pathlib import Path
           p = Path(os.environ['UKE_OUT_DIR']) / 'tree/build/display-analysis/mobile-graphics-legacy-abi.json'
@@ -265,8 +272,11 @@ jobs:
               p.write_text(json.dumps({'runtime_metadata_checkpoint_sha256':
                                        '3044c2beff552911605994c0dc7aa73182066cbb5aed0b396999ceeb5a96da2b'}) + '\n')
           PY2
-          ( cd "$workspace" && python3 scripts/build-native-legacy-display.py )
-          ls -l "$workspace/build/native-legacy-display/" 2>/dev/null || true
+            ( cd "$workspace" && python3 scripts/build-native-legacy-display.py )
+            ls -l "$workspace/build/native-legacy-display/" 2>/dev/null || true
+          else
+            echo "legacy display disabled in ${{ inputs.defconfig }}: no display archive needed (stub path)"
+          fi
           ls -l "$workspace/build/corecrypto-2023/"*.a 2>/dev/null | tail -3 || true
 
       - name: Link the kernel (prelink included)
