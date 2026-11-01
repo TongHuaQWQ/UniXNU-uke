@@ -137,8 +137,11 @@ jobs:
           ./unixnu ipsw fetch -D ../UniXNU-uke
           ls -lR out/ipsw | head -40
 
-      # --- pass 1: compile records + the prelinked candidate the archives audit against ------------
-      - name: Bootstrap kernel and prelinked candidate
+      # Pass 1 produces two things nothing else can: the compile records of a full XNU compile, and
+      # the prelinked candidate the original-class audits compare against. It runs in its own config
+      # directory (format 2: one tree per config), and the candidate is then staged into the target
+      # tree by the next step.
+      - name: Pass 1 — bootstrap records and the prelink candidate
         working-directory: UniXNU
         run: |
           set -x
@@ -151,7 +154,6 @@ jobs:
           test -f "$BS/kernel/kernel.macho"
           test -f "$BS/kernel/kernel.json"
 
-      # --- pass 2: assemble the target tree and stage that candidate into it -----------------------
       - name: Assemble the target tree and stage the prelink candidate
         working-directory: UniXNU
         run: |
@@ -168,8 +170,25 @@ jobs:
           done
           ls -l "$OUT/tree/build/native-prelink/"
 
-      # The first-console configuration does not opt in to the board archive list
-      # (CONFIG_XNU_BUILD_ARCHIVES), so its archives are built here explicitly.
+      # A configuration without CONFIG_XNU_BUILD_ARCHIVES (uke_defconfig) links without the archives the
+      # driver would otherwise build, so this pass stops at the link — on purpose. What it leaves behind
+      # is what the archive builders need: build/xnu/ios-obj/... (EXPORT_HDRS and the compile records).
+      # The separate bootstrap config's tree cannot provide them: format 2 gives every config its own tree.
+      - name: Pass 2 — compile records inside the target tree (link expected to fail)
+        if: inputs.defconfig == 'uke_defconfig'
+        working-directory: UniXNU
+        run: |
+          set -x
+          if ./unixnu build kernel -D ../UniXNU-uke; then
+            echo "::notice::the unixnu driver linked without the archives; continuing"
+          else
+            echo "::warning::this pass stopped at the link, which is expected for a config without CONFIG_XNU_BUILD_ARCHIVES"
+          fi
+          test -f "$UNIXNU_OUT/tree/build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/osfmk/DEVELOPMENT/startup.o.json"
+          test -d "$UNIXNU_OUT/tree/build/xnu/ios-obj/EXPORT_HDRS"
+
+      # The first-console configuration does not opt in to the board archive list, so its archives are
+      # built here explicitly, in the same tree as the records from pass 2.
       - name: Build the first-console archives
         if: inputs.defconfig == 'uke_defconfig'
         working-directory: UniXNU
@@ -182,26 +201,27 @@ jobs:
           ( cd "$workspace" && python3 scripts/build-arm-driver.py ArmDTPlatform )
           ( cd "$workspace" && python3 scripts/build-arm-driver.py ArmCpu )
           mkdir -p "$workspace/build/display-analysis"
-          UNIXNU_OUT="$UNIXNU_OUT" python3 - <<'PY'
+          UNIXNU_OUT="$UNIXNU_OUT" python3 - <<'PY2'
           import json, os
           from pathlib import Path
           p = Path(os.environ['UNIXNU_OUT']) / 'tree/build/display-analysis/mobile-graphics-legacy-abi.json'
           if not p.exists():
               p.write_text(json.dumps({'runtime_metadata_checkpoint_sha256':
                                        '3044c2beff552911605994c0dc7aa73182066cbb5aed0b396999ceeb5a96da2b'}) + '\n')
-          PY
+          PY2
           ( cd "$workspace" && python3 scripts/build-native-legacy-display.py )
           ls -l "$workspace/build/native-legacy-display/" 2>/dev/null || true
+          ls -l "$workspace/build/corecrypto-2023/"*.a 2>/dev/null | tail -3 || true
 
-      - name: Build the kernel
+      - name: Link the kernel (prelink included)
         working-directory: UniXNU
         run: |
           set -x
-          ./unixnu defconfig ${{ inputs.defconfig }} -D ../UniXNU-uke
           ./unixnu build kernel -D ../UniXNU-uke
           OUT=$(./unixnu status --json -D ../UniXNU-uke | python3 -c 'import json,sys;print(json.load(sys.stdin)["output"])')
           echo "UNIXNU_OUT=$OUT" >> "$GITHUB_ENV"
           ls -l "$OUT/kernel"
+          test -f "$OUT/kernel/kernel.macho"
 
       - name: Collect artifacts (always)
         if: always()
