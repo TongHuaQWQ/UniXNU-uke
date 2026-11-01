@@ -14,11 +14,15 @@
     #address-cells = <2>;
     #size-cells = <2>;
 
-    // The high DRAM window the kernel owns: base 0x8C0000000, 9 GiB. One
-    // contiguous range: the ADT hand-off requires it.
+    // The high DRAM window the kernel owns: base 0x8C0000000, 5 GiB
+    // (0x8C0000000..0xA0000000). One contiguous range: the ADT hand-off requires it,
+    // and scripts/unixnu/devicetree.py refuses a payload.dram_size that disagrees.
+    // This unit is the 8 GB SKU (MemTotal 7492 MiB); the live /memory reg shows the
+    // fragments 0x880000000+0x2FB00000, 0x8B0000000+0x9F00000 and 0x8BA100000+0x1E00000
+    // besides this run, and the 12 GB reference machine used 0x8C0000000+0x240000000.
     memory@8c0000000 {
         device_type = "memory";
-        reg = <0x00000008 0xC0000000 0x00000002 0x40000000>;
+        reg = <0x00000008 0xC0000000 0x00000001 0x40000000>;
     };
 
     cpus {
