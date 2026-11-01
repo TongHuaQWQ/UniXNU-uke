@@ -200,12 +200,22 @@ jobs:
           OUT=$(./unixnu status --json -D ../UniXNU-uke | python3 -c 'import json,sys;print(json.load(sys.stdin)["output"])')
           echo "UKE_OUT_DIR=$OUT" >> "$GITHUB_ENV"
           echo "target output dir: $OUT"
-          mkdir -p "$OUT/tree/build/native-prelink"
-          for name in native-owner-mobile-graphics-candidate native-owner-ufs-cpu-desktop-v9-hid-init-candidate; do
-            cp "$UKE_BS_DIR/kernel/kernel.macho" "$OUT/tree/build/native-prelink/$name.macho"
-            cp "$UKE_BS_DIR/kernel/kernel.json"  "$OUT/tree/build/native-prelink/$name.json"
+          # Two directories are in use and they are not synonyms:
+          #   build/xnu-prelink/     the audit-*.py family, including audit-mobile-graphics-legacy.py
+          #                          which build-native-legacy-display.py runs as its first step;
+          #   build/native-prelink/  build-native-aes-bindings.py, build-native-hid-input.py,
+          #                          build-native-virtio-bindings.py.
+          # Upstream's workflow staged only the second, so the graphics audit reported
+          # "No reference candidate available". Stage both.
+          for dir in "$OUT/tree/build/xnu-prelink" "$OUT/tree/build/native-prelink"; do
+            mkdir -p "$dir"
+            for name in native-owner-mobile-graphics-candidate native-owner-ufs-cpu-desktop-v9-hid-init-candidate; do
+              cp "$UKE_BS_DIR/kernel/kernel.macho" "$dir/$name.macho"
+              cp "$UKE_BS_DIR/kernel/kernel.json"  "$dir/$name.json"
+            done
+            echo "--- $dir"
+            ls -l "$dir"
           done
-          ls -l "$OUT/tree/build/native-prelink/"
 
           # scripts/xnu_symbols.py prefers this checkpoint over nm-ing the target tree's objects
           # ("Names of the XNU kernel alone"). Pass 1's kernel is exactly that: a linked 4 KiB XNU with
