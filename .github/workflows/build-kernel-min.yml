@@ -44,6 +44,9 @@ permissions:
 env:
   HOMEBREW_NO_AUTO_UPDATE: 1
   HOMEBREW_NO_INSTALL_CLEANUP: 1
+  # Do NOT export UNIXNU_OUT / UNIXNU_DEVICE here: scripts/unixnu/config.py reads them as the output
+  # root and the device directory, so reusing either name makes every later command look for
+  # state.json in the wrong place ("unixnu: no configuration"). This workflow uses UKE_*_DIR instead.
 
 jobs:
   kernel:
@@ -148,7 +151,7 @@ jobs:
           ./unixnu defconfig bootstrap_defconfig -D ../UniXNU-uke
           ./unixnu build kernel -D ../UniXNU-uke
           BS=$(./unixnu status --json -D ../UniXNU-uke | python3 -c 'import json,sys;print(json.load(sys.stdin)["output"])')
-          echo "BOOTSTRAP_OUT=$BS" >> "$GITHUB_ENV"
+          echo "UKE_BS_DIR=$BS" >> "$GITHUB_ENV"
           echo "bootstrap output dir: $BS"
           ls -l "$BS/kernel"
           test -f "$BS/kernel/kernel.macho"
@@ -161,12 +164,12 @@ jobs:
           ./unixnu defconfig ${{ inputs.defconfig }} -D ../UniXNU-uke
           ./unixnu tree -D ../UniXNU-uke
           OUT=$(./unixnu status --json -D ../UniXNU-uke | python3 -c 'import json,sys;print(json.load(sys.stdin)["output"])')
-          echo "UNIXNU_OUT=$OUT" >> "$GITHUB_ENV"
+          echo "UKE_OUT_DIR=$OUT" >> "$GITHUB_ENV"
           echo "target output dir: $OUT"
           mkdir -p "$OUT/tree/build/native-prelink"
           for name in native-owner-mobile-graphics-candidate native-owner-ufs-cpu-desktop-v9-hid-init-candidate; do
-            cp "$BOOTSTRAP_OUT/kernel/kernel.macho" "$OUT/tree/build/native-prelink/$name.macho"
-            cp "$BOOTSTRAP_OUT/kernel/kernel.json"  "$OUT/tree/build/native-prelink/$name.json"
+            cp "$UKE_BS_DIR/kernel/kernel.macho" "$OUT/tree/build/native-prelink/$name.macho"
+            cp "$UKE_BS_DIR/kernel/kernel.json"  "$OUT/tree/build/native-prelink/$name.json"
           done
           ls -l "$OUT/tree/build/native-prelink/"
 
@@ -184,8 +187,8 @@ jobs:
           else
             echo "::warning::this pass stopped at the link, which is expected for a config without CONFIG_XNU_BUILD_ARCHIVES"
           fi
-          test -f "$UNIXNU_OUT/tree/build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/osfmk/DEVELOPMENT/startup.o.json"
-          test -d "$UNIXNU_OUT/tree/build/xnu/ios-obj/EXPORT_HDRS"
+          test -f "$UKE_OUT_DIR/tree/build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/osfmk/DEVELOPMENT/startup.o.json"
+          test -d "$UKE_OUT_DIR/tree/build/xnu/ios-obj/EXPORT_HDRS"
 
       # The first-console configuration does not opt in to the board archive list, so its archives are
       # built here explicitly, in the same tree as the records from pass 2.
@@ -194,17 +197,17 @@ jobs:
         working-directory: UniXNU
         run: |
           set -x
-          workspace="$UNIXNU_OUT/tree"
+          workspace="$UKE_OUT_DIR/tree"
           ( cd "$workspace" && python3 scripts/gen-touch-firmware.py )
           ( cd "$workspace" && python3 scripts/build-corecrypto-14.py )
           ( cd "$workspace" && python3 scripts/build-corecrypto-14.py --namespace )
           ( cd "$workspace" && python3 scripts/build-arm-driver.py ArmDTPlatform )
           ( cd "$workspace" && python3 scripts/build-arm-driver.py ArmCpu )
           mkdir -p "$workspace/build/display-analysis"
-          UNIXNU_OUT="$UNIXNU_OUT" python3 - <<'PY2'
+          UKE_OUT_DIR="$UKE_OUT_DIR" python3 - <<'PY2'
           import json, os
           from pathlib import Path
-          p = Path(os.environ['UNIXNU_OUT']) / 'tree/build/display-analysis/mobile-graphics-legacy-abi.json'
+          p = Path(os.environ['UKE_OUT_DIR']) / 'tree/build/display-analysis/mobile-graphics-legacy-abi.json'
           if not p.exists():
               p.write_text(json.dumps({'runtime_metadata_checkpoint_sha256':
                                        '3044c2beff552911605994c0dc7aa73182066cbb5aed0b396999ceeb5a96da2b'}) + '\n')
@@ -219,7 +222,7 @@ jobs:
           set -x
           ./unixnu build kernel -D ../UniXNU-uke
           OUT=$(./unixnu status --json -D ../UniXNU-uke | python3 -c 'import json,sys;print(json.load(sys.stdin)["output"])')
-          echo "UNIXNU_OUT=$OUT" >> "$GITHUB_ENV"
+          echo "UKE_OUT_DIR=$OUT" >> "$GITHUB_ENV"
           ls -l "$OUT/kernel"
           test -f "$OUT/kernel/kernel.macho"
 
@@ -228,7 +231,7 @@ jobs:
         run: |
           set -x
           mkdir -p artifacts
-          OUT="${UNIXNU_OUT:-}"
+          OUT="${UKE_OUT_DIR:-}"
           if [ -z "$OUT" ] && [ -d UniXNU ]; then
             OUT=$(cd UniXNU && ./unixnu status --json -D ../UniXNU-uke 2>/dev/null \
                   | python3 -c 'import json,sys;print(json.load(sys.stdin)["output"])' 2>/dev/null || true)
@@ -246,8 +249,8 @@ jobs:
           else
             echo "no kernel logs to collect" | tee -a artifacts/MISSING.txt
           fi
-          if [ -n "${BOOTSTRAP_OUT:-}" ] && [ -d "$BOOTSTRAP_OUT/logs" ]; then
-            cp -R "$BOOTSTRAP_OUT/logs" artifacts/bootstrap-logs
+          if [ -n "${UKE_BS_DIR:-}" ] && [ -d "$UKE_BS_DIR/logs" ]; then
+            cp -R "$UKE_BS_DIR/logs" artifacts/bootstrap-logs
           fi
           ls -lR artifacts | head -60
 
