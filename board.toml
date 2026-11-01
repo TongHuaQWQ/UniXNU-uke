@@ -39,7 +39,7 @@ fetch = ["KernelCache", "DeviceTree", "StaticTrustCache", "Cryptex1,SystemTrustC
 # first_lba and last_lba are the GPT entry "userdata" of LUN 0, read from the tablet.
 [userdata]
 first_lba = 0x2d3000
-last_lba = 0x3b147fa
+last_lba = 0x38417fa             # this unit: 58,988,539 x 4096 B = 225.0 GiB (12 GB reference: 0x3b147fa)
 lba_bytes = 4096
 windows = [
   { name = "OS", component = "OS" },
@@ -226,8 +226,9 @@ volume = "UKEESP"
 size_mib = 80
 loader = "firmware"
 title = "uke first boot: source 4K XNU to console"
-dram_size = "0x240000000"            # XNU VM DRAM: the full 9 GiB high range (0x8C0000000-0xB00000000)
-dram_base = "0x8C0000000"            # high DRAM range 0x8C0000000-0xB00000000; the ADT writes /chosen/dram-base
+dram_size = "0x140000000"            # XNU VM DRAM: this unit's whole high run (0x8C0000000-0xA0000000, 5 GiB).
+                                     # 8 GB SKU (MemTotal 7492 MiB); the 12 GB reference has 0x240000000 here.
+dram_base = "0x8C0000000"            # high DRAM range 0x8C0000000-0xA0000000; the ADT writes /chosen/dram-base
 skip_setup_tool = "scripts/seed-data-skip-setup.py"   # used by --skip-setup
 panic_screen = true                  # native XNU panic output; Font.h is vendored in scripts/
 trust_cache_sha256 = [
@@ -331,8 +332,9 @@ text_fixups = [
 [payload.adt]
 tool = "scripts/make-uke-adt.py"
 chip_id = "207"
-owned_memory_size = "0x130000000"     # 4.75 GiB, sheng's proven value on the same 12 GB RAM class; fits the 9 GiB
-                                      # high-bank run (0x8C0000000..0xB00000000) now mapped in uke's MemoryMapLib
+owned_memory_size = "0x100000000"     # 4 GiB of this unit's 5 GiB high run (0x8C0000000..0xA0000000).
+                                      # Ladder if DarwinBoot reports Out of Resources or the VM misbehaves:
+                                      # 0xC0000000 (3 GiB) -> 0x80000000 (2 GiB). 12 GB reference used 4.75 GiB.
 root_match_volume_uuid = "04769D26-2CA0-4825-B443-E2E5F88300F2"
 # mount(8) phase 1 requires a boot manifest hash to name /private/preboot/<hash>.
 # uke has no Apple personalization manifest, so this is an explicit bring-up

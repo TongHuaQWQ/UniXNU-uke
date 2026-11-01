@@ -1,0 +1,218 @@
+# Minimal, self-diagnosing replacement for build-kernel.yml.
+#
+# Why this exists: the upstream workflow has two jobs (first-console + full) that share the same
+# early steps, so one environment problem fails both and the artifact is just MISSING.txt (168 B).
+# This version keeps ONE job, traces every command, and on failure uploads the driver's own logs so
+# the error is visible instead of "Process completed with exit code 1".
+#
+# Install: copy to .github/workflows/build-kernel-min.yml in your fork, commit, push.
+# Run:     Actions -> "build-uke-kernel-min" -> Run workflow (pick a defconfig).
+#
+# Everything below mirrors the upstream steps; only logging, retries and failure visibility changed.
+
+name: build-uke-kernel-min
+
+on:
+  workflow_dispatch:
+    inputs:
+      defconfig:
+        description: 'Device defconfig to build'
+        required: true
+        default: 'uke_defconfig'
+        type: choice
+        options:
+          - uke_defconfig
+          - uke-full_defconfig
+      core_repository:
+        description: 'Core UniXNU repository (owner/name)'
+        required: true
+        default: 'Allenwdk/UniXNU'
+      core_ref:
+        description: 'Core UniXNU ref (branch or commit)'
+        required: true
+        default: 'uke-gpu'
+
+permissions:
+  contents: read
+
+env:
+  HOMEBREW_NO_AUTO_UPDATE: 1
+  HOMEBREW_NO_INSTALL_CLEANUP: 1
+  CACHE_SCHEMA: v6
+
+jobs:
+  kernel:
+    runs-on: macos-latest
+    timeout-minutes: 180
+
+    steps:
+      - name: Diagnose environment
+        run: |
+          set -x
+          sw_vers
+          uname -m
+          xcodebuild -version
+          xcode-select -p
+          brew --version
+          df -h /
+          echo "GITHUB_REPOSITORY=$GITHUB_REPOSITORY  GITHUB_REF=$GITHUB_REF  defconfig=${{ inputs.defconfig }}"
+
+      - name: Check out the device repository
+        uses: actions/checkout@v4
+        with:
+          path: UniXNU-uke
+
+      - name: Check out UniXNU
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.core_repository }}
+          ref: ${{ inputs.core_ref }}
+          path: UniXNU
+
+      - name: Record revisions
+        run: |
+          set -x
+          git -C UniXNU-uke rev-parse HEAD
+          git -C UniXNU rev-parse HEAD
+          git -C UniXNU-uke status --short | head -20
+
+      - name: Install the host tools (with retry)
+        run: |
+          set -x
+          for attempt in 1 2 3; do
+            if brew install cmake ninja unifdef llvm mtools dtc; then
+              break
+            fi
+            echo "::warning::brew install attempt $attempt failed; retrying after a formula check"
+            brew update --quiet || true
+            sleep $((attempt * 10))
+          done
+          echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
+          echo "$(brew --prefix unifdef)/bin" >> "$GITHUB_PATH"
+
+      - name: Verify the tools unixnu checks for
+        run: |
+          set -x
+          rc=0
+          for tool in git make clang cmake ninja unifdef mtools dtc xcodebuild; do
+            path="$(command -v "$tool" || echo MISSING)"
+            printf '%-10s %s\n' "$tool" "$path"
+            [ "$path" = "MISSING" ] && rc=1
+          done
+          exit $rc
+
+      # feeds.toml pins the SM7675 SoC layer as a SIBLING checkout:
+      #   [[source]] name = "sm7675"  git = ".../UniXNU-sm7675-common"  local = "../UniXNU-sm7675-common"
+      # The upstream workflow never clones it, so every `./unixnu` command dies with
+      #   "soc sm7675: .../UniXNU-sm7675-common is not a directory"
+      # on a clean runner. This step materialises it at the commit feeds.toml pins.
+      - name: Check out the SM7675 SoC layer (feeds.toml sibling source)
+        run: |
+          set -x
+          python3 - <<'PY' > /tmp/sm7675.txt
+          import tomllib
+          d = tomllib.load(open('UniXNU-uke/feeds.toml', 'rb'))
+          s = next(x for x in d['source'] if x['name'] == 'sm7675')
+          print(s['git'])
+          print(s['commit'])
+          PY
+          url=$(sed -n 1p /tmp/sm7675.txt)
+          sha=$(sed -n 2p /tmp/sm7675.txt)
+          echo "url=$url sha=$sha"
+          if ! git -C UniXNU-sm7675-common rev-parse -q --verify HEAD 2>/dev/null; then
+            git init -q UniXNU-sm7675-common
+            git -C UniXNU-sm7675-common remote add origin "$url" 2>/dev/null || true
+          fi
+          git -C UniXNU-sm7675-common fetch -q --depth 1 origin "$sha" \
+            || git -C UniXNU-sm7675-common fetch -q origin
+          git -C UniXNU-sm7675-common checkout -q "$sha"
+          git -C UniXNU-sm7675-common log -1 --format='%h %s'
+          ls UniXNU-sm7675-common | head
+
+      - name: Fetch the Apple references
+        working-directory: UniXNU
+        run: |
+          set -x
+          ./unixnu fetch xnu libplatform libdispatch AvailabilityVersions libpthread \
+                          corecrypto-2023 IOStorageFamily -D ../UniXNU-uke
+
+      - name: Fetch the target IPSW members
+        working-directory: UniXNU
+        run: |
+          set -x
+          ./unixnu ipsw fetch -D ../UniXNU-uke
+          ls -lR out/ipsw | head -40
+
+      - name: Bootstrap kernel and prelinked candidate
+        working-directory: UniXNU
+        run: |
+          set -x
+          ./unixnu defconfig bootstrap_defconfig -D ../UniXNU-uke
+          ./unixnu build kernel -D ../UniXNU-uke
+          test -f out/uke/kernel/kernel.macho
+          test -f out/uke/kernel/kernel.json
+          mkdir -p out/uke/tree/build/native-prelink
+          cp out/uke/kernel/kernel.macho \
+             out/uke/tree/build/native-prelink/native-owner-mobile-graphics-candidate.macho
+          cp out/uke/kernel/kernel.json \
+             out/uke/tree/build/native-prelink/native-owner-mobile-graphics-candidate.json
+          cp out/uke/kernel/kernel.macho \
+             out/uke/tree/build/native-prelink/native-owner-ufs-cpu-desktop-v9-hid-init-candidate.macho
+          cp out/uke/kernel/kernel.json \
+             out/uke/tree/build/native-prelink/native-owner-ufs-cpu-desktop-v9-hid-init-candidate.json
+          rm -f out/uke/kernel/kernel.macho out/uke/kernel/kernel.json
+          ls -l out/uke/tree/build/native-prelink/
+
+      - name: Build the first-console archives
+        if: inputs.defconfig == 'uke_defconfig'
+        working-directory: UniXNU
+        run: |
+          set -x
+          workspace=out/uke/tree
+          ( cd "$workspace" && python3 scripts/gen-touch-firmware.py )
+          ( cd "$workspace" && python3 scripts/build-corecrypto-14.py )
+          ( cd "$workspace" && python3 scripts/build-corecrypto-14.py --namespace )
+          ( cd "$workspace" && python3 scripts/build-arm-driver.py ArmDTPlatform )
+          ( cd "$workspace" && python3 scripts/build-arm-driver.py ArmCpu )
+          mkdir -p "$workspace/build/display-analysis"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('out/uke/tree/build/display-analysis/mobile-graphics-legacy-abi.json')
+          if not p.exists():
+              p.write_text(json.dumps({'runtime_metadata_checkpoint_sha256':
+                                       '3044c2beff552911605994c0dc7aa73182066cbb5aed0b396999ceeb5a96da2b'}) + '\n')
+          PY
+          ( cd "$workspace" && python3 scripts/build-native-legacy-display.py )
+
+      - name: Build the kernel
+        working-directory: UniXNU
+        run: |
+          set -x
+          ./unixnu defconfig ${{ inputs.defconfig }} -D ../UniXNU-uke
+          ./unixnu build kernel -D ../UniXNU-uke
+
+      - name: Collect artifacts (always)
+        if: always()
+        run: |
+          set -x
+          mkdir -p artifacts
+          if [ -f UniXNU/out/uke/kernel/kernel.macho ]; then
+            cp UniXNU/out/uke/kernel/kernel.macho artifacts/
+            cp UniXNU/out/uke/kernel/kernel.json artifacts/ 2>/dev/null || true
+            shasum -a 256 UniXNU/out/uke/kernel/kernel.macho | tee artifacts/kernel.macho.sha256
+          else
+            echo "kernel.macho was not produced" | tee artifacts/MISSING.txt
+          fi
+          cp -R UniXNU/out/uke/logs artifacts/logs 2>/dev/null || echo "no out/uke/logs to collect" | tee -a artifacts/MISSING.txt
+          cp -R UniXNU/out/uke/tree/build/display-analysis artifacts/ 2>/dev/null || true
+          ls -lR artifacts | head -60
+
+      - name: Upload artifacts (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uke-kernel-min
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 14
