@@ -15,7 +15,12 @@ include = [
   "ArmDTPlatform", "ArmCpu", "ArmVirtPlatform",
   "SoftwareAES", "ShengUfs", "ShengHidInput", "ShengNovatekTouch", "AppleKeyStoreState",
   "RamBlock", "VirtioMmioBlock", "VirtioMmioConsole",
-  "Adreno740", "AdrenoMetal", "GopFramebuffer", "QcomGeniSpi",
+  # GPU is its own track: its kernel-side components need the A732 firmware pins
+  # (.cache/firmware/uke-gpu) and the owner-built Metal plug-in, which a public runner cannot produce,
+  # and kernel.py:archive_plan requires every selected component with a kernel build recipe to appear
+  # in [kernel] archives. Restore these three lines together with the GPU archive entries.
+  # "Adreno740", "AdrenoMetal",
+  "GopFramebuffer", "QcomGeniSpi",
   "XnuPrelink", "DarwinBoot", "VerifiedRoot", "AirNir", "AdrenoPM4", "AdrenoFirmware", "ArmSmmu4K",
 ]
 
