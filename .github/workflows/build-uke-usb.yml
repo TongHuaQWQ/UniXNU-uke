@@ -77,6 +77,17 @@ jobs:
           echo "device $(git -C UniXNU-uke rev-parse HEAD)"
           echo "core   $(git -C UniXNU rev-parse HEAD)"
 
+      # Each round recompiles XNU from scratch otherwise: twenty minutes of macOS runner
+# time per attempt. Key the cache on the sources that decide the build (core + device
+# revisions, the workflow, the board files) so a changed source misses it cleanly.
+      - name: Restore the build tree
+        uses: actions/cache@v4
+        with:
+          path: |
+            UniXNU/out
+            UniXNU-uke/.cache
+          key: uke-usb-${{ hashFiles('UniXNU-uke/board.toml', 'UniXNU-uke/feeds.toml', 'UniXNU-uke/configs/**', 'UniXNU-uke/scripts/**', 'UniXNU-uke/patches/**', 'UniXNU-uke/package/**', 'UniXNU-uke/.github/workflows/build-uke-usb.yml') }}-${{ env.UKE_DEFCONFIG }}
+
       - name: Install the host tools
         run: |
           brew install cmake ninja unifdef llvm mtools dtc
