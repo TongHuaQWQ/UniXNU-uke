@@ -344,8 +344,8 @@ index cd18d0d..37d4222 100644
 +	    queue_empty(&RequestHead));
 +}
 +
-+extern "C" int boot_flight_worker_stack(thread_t, uint64_t *, unsigned *, uint64_t *, uint64_t[12]) __attribute__((weak_import));
-+extern "C" void boot_flight_cpu_status(uint64_t[32]) __attribute__((weak_import));
++extern "C" int boot_flight_worker_stack(thread_t, uint64_t *, unsigned *, uint64_t *, uint64_t[12]);
++extern "C" void boot_flight_cpu_status(uint64_t[32]);
 +
 +static void
 +uke_usb_pm_thread_snapshot(const char *role, IOWorkLoop *loop)
