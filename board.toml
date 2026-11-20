@@ -26,8 +26,11 @@ kit = "uke"                      # the package/ of this repository appears as ki
 [components]
 include = [
   "ArmDTPlatform", "ArmCpu", "XnuPrelink", "DarwinBoot", "AppleKeyStoreState",
-  "Adreno740", "AdrenoMetal", "AdrenoFirmware", "AdrenoPM4", "ArmSmmu4K", "AirNir", "Sm7675Platform",
-  "GopFramebuffer", "QcomGeniSpi", "ShengNovatekTouch", "ShengHidInput",
+  "ArmSmmu4K", "Sm7675Platform",
+  # Display, touch, input, Wi-Fi and the Adreno chain are out for this round: their archives
+  # need the firmware caches and ABI observation inputs the board workflow stages, and none of
+  # them is on the DWC3 path (run 44677633586 stopped in build-adreno740-kits on a missing
+  # ShengGmuSource.h). They come back with the display/GPU rounds.
   # Storage chain (ShengUfs, VirtioMmioBlock, RamBlock, VerifiedRoot) is out for this round: the
   # ShengUfs kernel recipe runs scripts/build-sheng-source-storage.py, which refuses to build
   # without the signed ipados-27.0.1-24A446 root policies (run 44675246333: "incomplete signed
@@ -78,14 +81,9 @@ archives = [
   "build-software-aes-27.py",
   # Source storage: ShengUfs against the public IOStorageFamily, the Data RAM block and the verify target.
   # "component:VirtioMmioBlock", "component:ShengUfs", "component:RamBlock" — see [components].
-  # Compile the source HID adapter before binding it to the original 24A446 IOHIDDevice.
-  "component:ShengHidInput",
-  # Upstream fixed-address display/HID adapters are relocated by XnuPrelink.
-  "prepare-uke-gmu.py",
-  "component:Adreno740",
-  "build-adreno740-kits.py",
-  "build-adreno740-accelerator.py",
-  "build-native-legacy-display-27.py",
+  # The USB device stack, extracted from build-native-legacy-display-27.py so the display,
+  # touch and Adreno inputs that builder needs are not a prerequisite for USB.
+  "build-uke-usb.py",
   # Match the stripped Apple kernel against the real upstream RELEASE/LTO reference.
 ]
 
@@ -212,7 +210,12 @@ BUILDID_STRING = "uke-research"
 [payload]
 # Exact original 24A446 StaticTrustCache + SystemTrustCache modules.
 # Original modules remain byte-for-byte; the historical 21H461 owner bundle is not an input here.
-trust_cache_sha256 = ["dc655bcb2ddfaea214f9ec83659b3fc8d8b658bafac2b5a004fb4179a25c89bf"]
+# Measured 2026-11-20 from the 24A446 restore the profile names:
+#   unixnu ipsw fetch  ->  Firmware/043-68950-668.dmg.aea.trustcache
+#   sha256 dc3642e0b44bcb3912126b19770cffcf07b9fb40f7196df32d54bb54acc0550a
+# The previous pin (dc655bcb...) matches neither this member nor the
+# Cryptex1,SystemTrustCache one (34d6186f...), so payload.py refused the file.
+trust_cache_sha256 = ["dc3642e0b44bcb3912126b19770cffcf07b9fb40f7196df32d54bb54acc0550a"]
 volume = "UKEESP"
 # The 24A446 fileset kernel is ~91 MiB; the stock vendor_boot partition is 96 MiB, so the FAT volume
 # sits near the ceiling (payload + DTB + table must stay under it).

@@ -1,0 +1,20 @@
+# uke / iPadOS 27.0.1 (24A446), arm64e — USB diagnostic round.
+#
+# One question: does the upstream Qualcomm DWC3 subclass (QcomDwc3) plus Apple's
+# untouched USB device stack enumerate on this tablet? So this configuration keeps
+# only the shared arm64e sources, the platform providers and the USB archive:
+# no storage (its builder wants the signed root policies), no display provider, no
+# GPU, no touch. The display/GPU/storage rounds add their own archives back.
+#
+# The USB objects come from build/uke-usb/libUkeUsb.a, built by scripts/build-uke-usb.py,
+# which is the USB section of scripts/build-native-legacy-display-27.py extracted whole
+# (same flags, same generated headers, same per-slot vtable verification against
+# scripts/usb-xdci-24A446.json and scripts/usb-xhci-24A446.json).
+CONFIG_XNU_KERNEL_CHAINED_FIXUPS=y
+CONFIG_XNU_CRYPTO_BOOTSTRAP="source"
+CONFIG_XNU_BUILD_ARCHIVES=y
+CONFIG_XNU_ARMVIRT_PLATFORM=n
+CONFIG_XNU_DT_PANIC_REGION=y
+CONFIG_XNU_NATIVE_LEGACY_DISPLAY=n
+CONFIG_XNU_NATIVE_ADRENO=n
+CONFIG_XNU_EXTRA_LD_ARCHIVES="-Wl,-force_load,{tree}/build/software-aes-27/libSoftwareAES27.a -Wl,-force_load,{tree}/build/uke-usb/libUkeUsb.a"
