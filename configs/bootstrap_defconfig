@@ -6,6 +6,14 @@ CONFIG_XNU_CRYPTO_BOOTSTRAP="prelinked"
 # CONFIG_XNU_SOURCE_PTHREAD is not set
 # CONFIG_XNU_ARM_DT_PLATFORM is not set
 # CONFIG_XNU_ARMCPU is not set
+# The ARM64 common fragment (arch:configs/common.config) sets
+# CONFIG_XNU_NATIVE_ARCH_TIMER=y, and scripts/build-xnu-4k-baseline.sh refuses that with
+# XNU_ARMCPU=0: 'Architectural timer entry requires the actual ArmCpu interrupt provider'
+# (measured: run 44673583307, step 'Bootstrap kernel and prelinked candidate'). The
+# bootstrap pass has no archives, so ArmCpu cannot be linked here; the pass exists for
+# compile records and a prelinked candidate only, and the target pass recompiles with the
+# board defconfig. The legacy timer path is therefore correct for this pass alone.
+CONFIG_XNU_NATIVE_ARCH_TIMER=n
 CONFIG_XNU_NATIVE_MOBILE_DISPLAY=n
 CONFIG_XNU_ARMVIRT_PLATFORM=n
 # CONFIG_XNU_NATIVE_UFS is not set
