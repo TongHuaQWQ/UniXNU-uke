@@ -228,7 +228,13 @@ skip_setup_tool = "scripts/seed-data-skip-setup.py"   # used by --skip-setup
 panic_screen = true
 # The signed root-policy bundle (build-sheng-source-storage.py): with XNU_SOURCE_STORAGE_TABLES=userdata only the
 # 544-byte headers travel here as kernel.macho.vroot; the hash tables live in the userdata image as OS.vroot.
-root_policies = "{tree}/build/sheng-source-storage/root-policies.bin"
+# Diagnostic round 2026-11-20: commented out while the 24A446 verified-root bundle is not in this
+# tree. The kernel step preflights every configured root window against the matching
+# scripts/policies/<profile>/<OS|SystemOS>/ record, and without it the kernel does not build
+# ("Root policy preflight failed: No such file or directory ... OS/verification.json").
+# Only the root-mount/VerifiedRoot path is affected; the DWC3 bring-up and the Apple USB
+# device stack run before it. Restore this line with the bundle.
+# root_policies = "{tree}/build/sheng-source-storage/root-policies.bin"
 # 24A446 CPU compositor: register IOSurface-backed SW surfaces through the original
 # Context::track_surface before the first push. Original bytes must match; the
 # signature validator and original factory/NULL/retain/PAC paths remain in use.
