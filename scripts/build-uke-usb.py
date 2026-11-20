@@ -381,6 +381,11 @@ extern "C" bool uke_outside_dram_contains(uint64_t, uint64_t) { return false; }
 extern "C" uint64_t native_timebase_trap_total(void) { return 0; }
 
 /* uke-gpu-prepare-outside-iokit.patch: the Adreno client grants. */
+extern "C" void *native_adreno_prepare_external(IOUserClient *, uint32_t,
+                                                const IOExternalMethodArguments *) { return nullptr; }
+/* The DP desktop path UkeUsbBoard carries: no DPU mapping, so it reports "unavailable". */
+extern "C" uint32_t native_ufs_dpu_live(unsigned) { return ~0u; }
+extern "C" uint32_t uke_ufs_dpu_map_external(unsigned, const uint64_t *, unsigned) { return 0; }
 extern "C" void native_adreno_finish_external(IOService *, uint32_t) {}
 extern "C" uint32_t native_adreno_preflight_ready = 0;
 extern "C" void *native_user_pt_attr = nullptr;
