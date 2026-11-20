@@ -333,7 +333,7 @@ compile_c(remoteproc / 'QcomRpmh.c', USB_OUT / 'QcomRpmh.o')
 board_objects.append(USB_OUT / 'QcomRpmh.o')
 if not DISPLAY_ARCHIVE.is_file():
     print('display archive absent: linking the inert DP/backlight fallbacks')
-    compile_cpp(BOARD_STUB, USB_OUT / 'UsbBoardStubs.o')
+    compile_cpp(BOARD_STUB, USB_OUT / 'UsbBoardStubs.o', (*usb_flags, '-I', str(ROOT / 'drivers/GopFramebuffer')))
     board_objects.append(USB_OUT / 'UsbBoardStubs.o')
 
 usb_raw = (USB_OUT / 'QcomDwc3.o').read_bytes()
