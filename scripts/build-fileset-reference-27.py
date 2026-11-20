@@ -108,7 +108,12 @@ if result.returncode:
         stubs = output / 'native-stubs.c'
         stubs.write_text(''.join(f'long {name[1:]};\n' for name in missing))
         obj = output / 'native-stubs.o'
-        cc = os.environ.get('CROSS_CLANG') or f'{clt}/bin/clang'
+        # `clt` only exists on the Linux branch of this script; on a macOS runner the toolchain
+        # clang is found through xcrun (measured: run 44739572191, NameError: name 'clt' is not defined).
+        local_toolchain = Path(os.environ.get('CLT_PREFIX', '/opt/unixnu-linux/CommandLineTools/usr')) / 'bin/clang'
+        cc = (os.environ.get('CROSS_CLANG')
+              or (str(local_toolchain) if local_toolchain.is_file()
+                  else subprocess.check_output(['xcrun', '-f', 'clang'], text=True).strip()))
         subprocess.run([cc, '--target=arm64e-apple-ios27.0', '-mkernel', '-c',
                         '-o', str(obj), str(stubs)], check=True)
         for i, a in enumerate(args):
