@@ -576,7 +576,7 @@ diff --color -ruN a/osfmk/arm64/machine_routines.c b/osfmk/arm64/machine_routine
 diff --color -ruN a/osfmk/arm64/sleh.c b/osfmk/arm64/sleh.c
 --- a/osfmk/arm64/sleh.c	2026-11-11 06:37:49
 +++ b/osfmk/arm64/sleh.c	2026-11-11 13:50:42
-@@ -606,6 +606,16 @@
+@@ -606,6 +606,25 @@
  	kernel_integrity_error_handler(esr, far);
  #endif
  
@@ -586,7 +586,18 @@ diff --color -ruN a/osfmk/arm64/sleh.c b/osfmk/arm64/sleh.c
 +	 */
 +	extern bool ml_memory_probe_fault(void);
 +	if ((source == PLAT_ERR_SRC_SYNC) && ml_memory_probe_fault()) {
++#if HAS_ADD_SAVED_STATE_PC
 +		add_saved_state_pc(state, 4);
++#else
++		/* The RELEASE comparison kernel has no add_saved_state_pc (DEBUG/DEVELOPMENT only,
++		 * osfmk/mach/arm/thread_status.h). It only supplies symbol identities and never runs,
++		 * so advance the PC without the PAC-preserving helper. */
++		if (is_saved_state32(state)) {
++			saved_state32(state)->pc += 4;
++		} else {
++			saved_state64(state)->pc += 4;
++		}
++#endif
 +		return;
 +	}
 +
