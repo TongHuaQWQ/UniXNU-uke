@@ -68,7 +68,7 @@ defconfig = "uke_ipados27_defconfig"
 config_fragments = ["arch:configs/common.config", "os:configs/ipados.config"]
 # The device series is the board series minus the three diagnostics that cannot compile into the
 # RELEASE comparison kernel the prelink reads (patches/xnu-12377/series-usb explains each one).
-patch_series = ["arch:patches/xnu/series", "soc:patches/xnu-12377/series", "os:patches/xnu/series", "device:patches/xnu-12377/series-usb"]
+patch_series = ["arch:patches/xnu/series", "soc:patches/xnu-12377/series", "os:patches/xnu/series", "device:patches/xnu-12377/series"]
 # Archive builders of the kernel step, in order. They run only for a configuration with
 # CONFIG_XNU_BUILD_ARCHIVES=y (uke_ipados27_defconfig). This is the first link gate: the shared
 # source archives only. The source-storage, display, HID and boot-log builders are added here as
