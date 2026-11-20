@@ -123,22 +123,34 @@ jobs:
 
       - name: Give the comparison kernel its RELEASE-only board hooks
         working-directory: UniXNU
+        # emit_prelink.py needs a symbol-bearing RELEASE kernel, and
+        # scripts/build-fileset-release-reference.py force-links corecrypto, libpthread, ArmDTPlatform
+        # and ArmCpu only — never a board archive. The board patches call these four from
+        # arm_init/arm_vm_init and IOServicePM, so the comparison link reports them undefined. Weak,
+        # so the archive definitions win in the shipping kernel; the PM snapshot is guarded because
+        # the board's own definition only exists in DEVELOPMENT.
         run: |
           set -x
           f="$UKE_OUT/tree/.cache/xnu-work/iokit/Kernel/IOServicePM.cpp"
           test -f "$f" || { echo "::error::no prepared xnu tree at $f"; exit 1; }
-          if grep -q 'uke_usb_pm_snapshot(IOService \*service) { (void)service; }' "$f"; then
-            echo "hook already present"
+          if grep -q 'round usb24-1: board hooks for the comparison kernel' "$f"; then
+            echo "hooks already present"
           else
-            printf '\n#if !(DEVELOPMENT || DEBUG)\nextern "C" void uke_usb_pm_snapshot(IOService *service) { (void)service; }\n#endif\n' >> "$f"
-            echo "hook appended"
+            {
+              printf '\n/* round usb24-1: board hooks for the comparison kernel. */\n'
+              printf 'extern "C" __attribute__((weak)) void uke_boot_stage(const char *text) { (void)text; }\n'
+              printf 'extern "C" __attribute__((weak)) void uke_boot_stage_unbind(void) {}\n'
+              printf 'extern "C" __attribute__((weak)) void uke_boot_stage_bind(uintptr_t frame, unsigned width,\n'
+              printf '    unsigned height, unsigned stride, unsigned depth)\n'
+              printf '{ (void)frame; (void)width; (void)height; (void)stride; (void)depth; }\n'
+              printf '#if !(DEVELOPMENT || DEBUG)\n'
+              printf 'extern "C" void uke_usb_pm_snapshot(IOService *service) { (void)service; }\n'
+              printf '#endif\n'
+            } >> "$f"
+            echo "hooks appended"
           fi
-          tail -5 "$f"
+          tail -12 "$f"
 
-      # One step, the driver's own sequence: compile records -> the board archive list
-      # (build-uke-usb.py, then the RELEASE comparison kernel that build/release-reference names)
-      # -> link -> prelink. The records pass links before any archive exists and cannot satisfy the
-      # board patches' boot-stage hooks; the driver says so and carries on, so tolerate only that.
       - name: Pass 2 — link and prelink the kernel
         working-directory: UniXNU
         env:

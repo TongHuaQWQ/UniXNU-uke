@@ -2,7 +2,7 @@ diff --git a/iokit/Kernel/IOServicePM.cpp b/iokit/Kernel/IOServicePM.cpp
 index cd18d0d..37d4222 100644
 --- a/iokit/Kernel/IOServicePM.cpp
 +++ b/iokit/Kernel/IOServicePM.cpp
-@@ -70,6 +70,44 @@ static void tellKernelClientApplier(OSObject * object, void * arg);
+@@ -70,6 +70,30 @@ static void tellKernelClientApplier(OSObject * object, void * arg);
  static void tellAppClientApplier(OSObject * object, void * arg);
  static const char * getNotificationPhaseString(uint32_t phase);
  
@@ -33,20 +33,6 @@ index cd18d0d..37d4222 100644
  static uint64_t
  computeTimeDeltaNS( const AbsoluteTime * start )
  {
-+
-+#if !(DEVELOPMENT || DEBUG)
-+/* The comparison kernel emit_prelink reads is RELEASE (scripts/build-fileset-release-reference.py);
-+ * this TU's diagnostic definition at the end of the file is not part of that build, so the RELEASE
-+ * link needs this answer. DEVELOPMENT keeps the real tracing implementation. */
-+extern "C" void uke_usb_pm_snapshot(IOService *service) { (void)service; }
-+#endif
-+
-+#if !(DEVELOPMENT || DEBUG)
-+/* The comparison kernel emit_prelink reads is RELEASE (scripts/build-fileset-release-reference.py);
-+ * this TU's diagnostic definition at the end of the file is not part of that build, so RELEASE
-+ * needs an answer here. DEVELOPMENT keeps the real tracing implementation. */
-+extern "C" void uke_usb_pm_snapshot(IOService *service) { (void)service; }
-+#endif
 @@ -1162,23 +1186,41 @@ IOService::registerPowerDriver(
  	IOPMPSEntry *       powerStatesCopy = NULL;
  	IOPMPowerStateIndex stateOrder;
@@ -339,7 +325,7 @@ index cd18d0d..37d4222 100644
  		if (!done) {
  			break; // PM state machine blocked
  		}
-@@ -9620,3 +9753,115 @@ IOServicePM::pmTrace(
+@@ -9620,3 +9753,101 @@ IOServicePM::pmTrace(
  	IOTimeStampConstant(IODBG_POWER(event) | eventFunc, nameAsArg, (uintptr_t)Owner->getRegistryEntryID(), (uintptr_t)(OBFUSCATE(param1)), (uintptr_t)(OBFUSCATE(param2)));
  #endif
  }
@@ -440,20 +426,6 @@ index cd18d0d..37d4222 100644
 +		}
 +	}
 +	IOLog("[usb pm] snapshot end\n");
-+}
-+
-+/*
-+ * Weak fallbacks for board hooks the rest of this series calls. A RELEASE comparison build
-+ * (scripts/build-fileset-release-reference.py, which emit_prelink reads) force-links only
-+ * corecrypto, libpthread, ArmDTPlatform and ArmCpu, never the board archives, so these would be
-+ * undefined in it. Weak, so the archive definitions win in every shipping kernel.
-+ */
-+extern "C" __attribute__((weak)) void uke_boot_stage(const char *text) { (void)text; }
-+extern "C" __attribute__((weak)) void uke_boot_stage_unbind(void) {}
-+extern "C" __attribute__((weak)) void uke_boot_stage_bind(uintptr_t frame, unsigned width,
-+    unsigned height, unsigned stride, unsigned depth)
-+{
-+	(void)frame; (void)width; (void)height; (void)stride; (void)depth;
 +}
 diff --git a/iokit/Kernel/IOServicePMPrivate.h b/iokit/Kernel/IOServicePMPrivate.h
 index 5dd3886..a81dd5e 100644
