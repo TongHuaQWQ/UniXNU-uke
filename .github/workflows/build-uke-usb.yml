@@ -33,6 +33,13 @@ on:
         required: true
         default: 'main'
 
+# One USB round at a time, and a dispatch must never kill a round that is already
+# building: two dispatches minutes apart cancelled each other's queued run
+# (runs 44754621330 and 44759834562 arrived as 'cancelled' with no steps).
+concurrency:
+  group: build-uke-usb-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
 
