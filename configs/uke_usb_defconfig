@@ -10,10 +10,12 @@
 # which is the USB section of scripts/build-native-legacy-display-27.py extracted whole
 # (same flags, same generated headers, same per-slot vtable verification against
 # scripts/usb-xdci-24A446.json and scripts/usb-xhci-24A446.json).
-# Chained fixups off for this round: kits/XnuPrelink/kc_image.fixups() refuses them on the
-# native side ("Chained fixup imports are not supported", run 44748418254 prelink.log), and a
-# USB-only kernel needs the prelinked kernelcache kexts more than the newer fixup format.
-# CONFIG_XNU_KERNEL_CHAINED_FIXUPS=n
+# Chained fixups stay on: emit_prelink needs them (fileset_layout.split_references requires
+# LC_SEGMENT_SPLIT_INFO, which the linker emits together with chained fixups), and
+# kc_image.fixups() only refuses a table that carries *imports*. The eight imports run 44748418254
+# had were exactly the weak_import board hooks nothing defined; build/uke-usb's weak hook unit
+# defines all eight now, so the table should be import-free.
+CONFIG_XNU_KERNEL_CHAINED_FIXUPS=y
 CONFIG_XNU_CRYPTO_BOOTSTRAP="source"
 CONFIG_XNU_BUILD_ARCHIVES=y
 CONFIG_XNU_ARMVIRT_PLATFORM=n
