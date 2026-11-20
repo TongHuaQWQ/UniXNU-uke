@@ -303,12 +303,22 @@ BOARD_STUB.write_text("""// SPDX-License-Identifier: BSD-2-Clause-Patent
 // (package/AppleARMBacklight.cpp: uke_backlight_with_wcd_bus returns kIOReturnNotReady while no
 // ShengBacklight has published).
 #include "UkeUsbBoard.h"
+#include "NativeExternalDisplay.h"
 #include <IOKit/IOReturn.h>
 extern "C" bool native_legacy_dp_debug() { return false; }
 extern "C" bool native_legacy_panel_dma_left_ready() { return false; }
 extern "C" IOReturn native_legacy_panel_route_dma(bool) { return kIOReturnUnsupported; }
 IOReturn uke_backlight_with_wcd_bus(UkeWcdBusAction, void *) { return kIOReturnNotReady; }
+// package/LegacyDisplayProbe.cpp owns this one. Its callers treat kIOReturnNotFound as
+// "no desktop service to hand a link to" and only retry that answer, so return exactly it.
+IOReturn uke_dp_set_external_display(const NativeExternalDisplayLink *) { return kIOReturnNotFound; }
 """)
+
+# The C++ flags of one kernel unit (display builder, its line 305): the compile record the
+# bootstrap pass leaves behind. Every compile_cpp below reuses these arguments.
+RECORD = ROOT / 'build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/iokit/DEVELOPMENT/IOPlatformExpert.cpo.json'
+require(RECORD.is_file(), f'compile record missing: {RECORD} (run the bootstrap kernel pass first)')
+r = json.loads(RECORD.read_text().strip().rstrip(','))
 
 usb_flags = ('-DQCOM_DWC3_UKE_USB2', '-I', str(USB_OUT), '-I', str(USB), '-I', str(KITS),
              '-I', str(remoteproc))
