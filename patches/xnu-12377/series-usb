@@ -1,0 +1,182 @@
+# Board patches for xnu-12377 — the same series as patches/xnu-12377/series, minus the three
+# patches whose board hooks have no definition in a RELEASE build.
+#
+# Why: emit_prelink.py needs a symbol-bearing RELEASE comparison kernel
+# (profiles/os/ipados-27.0.1-24A446, extra_args --fileset-reference), and
+# scripts/build-fileset-release-reference.py force-links only corecrypto, libpthread,
+# ArmDTPlatform and ArmCpu — never the board archives. Any patch that calls a board symbol
+# therefore has to compile with the symbol undefined, and these three do call board symbols:
+#
+#   uke-usb-pm-trace.patch        -> uke_usb_pm_snapshot       (IOServicePM)
+#   uke-vm-init-checkpoints.patch -> uke_boot_stage{,_bind,_unbind} (arm_init/arm_vm_init)
+#   uke-outside-dram-wc.patch     -> uke_boot_stage            (arm_vm_init)
+#
+# They are diagnostics (boot checkpoints, PowerManagement tracing, WC PTE attributes for the
+# outside-DRAM window) and none of them is on the DWC3 enumeration path. They come back when
+# the display and PM rounds bring their archives, because then the definitions exist in both
+# builds. The list below is otherwise byte-identical to patches/xnu-12377/series.
+#
+native-ptrauth-null-portability.patch
+
+# --- UniXNU-sheng origin/main patches/xnu-12377/series, verbatim ---
+zzye-sheng-cpu-idle.patch
+zzyf-sheng-amp.patch
+zzyd-sheng-audio-addon-mount.patch
+source-storage-runtime.patch
+zzzz-sheng-ipados27-bringup.patch
+zzzzzzzzzz-sheng-sigp-reinit-assert.patch
+
+# Bound the proximate virtual timer wait and rearm a pop without an IRQ.
+uke-idle-timer-rearm.patch
+zzzzz-sheng-ipc-trace.patch
+zzzzz-sheng-ioconnect-trace.patch
+zzzzz-sheng-contig-trace.patch
+
+# --- uniXNU device adaptation: the video console must find our GOP framebuffer ---------------
+# sheng's DarwinBoot equivalent passes the framebuffer base with the low-bit "physical" marker
+# XNU expects; ours hands over a clean physical address (0xE3940000), so initialize_screen()
+# treats it as a virtual address and never maps it. Without these two the kernel reaches
+# vcattach(), decides there is no video, switches to a serial console this board does not have,
+# and every kprintf is dropped. Taken verbatim from the iOS 17 line
+# (UniXNU-uke/patches/xnu/zzzzz-video-console-physical-fb.patch and zzzzzz-video-console-text.patch).
+uke-video-console-physical-fb.patch
+uke-video-console-text.patch
+
+# --- uke diagnostic only: live high-VA checkpoints before and across VM bootstrap ---
+# round usb24-1: uke-vm-init-checkpoints.patch is out (see the header note)
+
+# IRQ-masked kprintf enqueues into the existing console ring; a thread call drains it.
+# Preserve the synchronous panic/debugger path and existing framebuffer mappings.
+uke-deferred-video-kprintf.patch
+
+# Bounded observation only; leaves original Image4 policy and handler intact.
+uke-ignition-sysctl-trace.patch
+
+# Observe gate versus ready polling only on the traced sysctl thread.
+uke-ignition-wait-trace.patch
+
+# Observe original Image4 service start and its native AES matching dependency.
+uke-image4-service-trace.patch
+
+# Recheck early owner identity against both actual authenticated media.
+uke-owner-boot-set-recheck.patch
+
+# Read-only observation of the original user-client result and submitted sizes.
+uke-display-call-trace.patch
+
+zzzzzz-sheng-latency-trace.patch
+zzzzzzzz-sheng-exit-latency.patch
+zzzzzzzzz-sheng-unnest-trace.patch
+
+# Optional GPU map/external-method phase timestamps; locking is unchanged.
+uke-gpu-iokit-phases.patch
+
+# Prepare unowned native GPU pages outside the mapping-exclusion lock;
+# original locked dispatch still validates/adopts, cleanup stays after ipcExit.
+uke-gpu-prepare-outside-iokit.patch
+
+# Use a bounded pool for optional UPL delayed-work contexts.
+uke-vm-delayed-work-pool.patch
+
+# Match native class registration to the existing OSKext lock order.
+uke-kext-registration-lock-order.patch
+
+# Original launchd consumes the signed owner cache with the icon-service policy.
+uke-icon-services-cache.patch
+
+# Wi-Fi join results: the 24A446 association event is 540 bytes, which does not
+# fit MLEN. Let the Apple IEEE80211 class carry MCLBYTES and build it with a
+# cluster mbuf; every other class keeps the old limit. Verbatim from sheng
+# (patches/xnu-12377/sheng-wifi-association-event.patch), applies with -390 lines.
+uke-wifi-association-event.patch
+
+# The native supplicant lives in the Data addon; xpcproxy needs a system path.
+# Union-mounts /private/var/ngpu/wifi-bin over /usr/libexec (launchd_cache_loader
+# stays visible, unixnu-wpa_supplicant comes from the addon).
+uke-wifi-launchd-cache.patch
+
+# Read-only service/cache-loader launch facts; original AMFI return is preserved.
+uke-wifi-launch-facts.patch
+
+# Actual authenticated SystemOS root union identity; keep original AMFI decisions.
+uke-systemos-root-identity.patch
+
+# Owner-signed backboardd brightness mode, gated with the backlight driver.
+uke-backlight-runtime.patch
+
+# CLI > bounded ADT driver defaults > upstream built-in defaults, selected keys only.
+uke-adt-driver-args.patch
+
+# Legacy sheng-* and upstream argument names share the existing precedence.
+uke-upstream-boot-arg-aliases.patch
+
+# Keep loader-approved outside-window DRAM Normal for GPU WC mappings.
+# round usb24-1: uke-outside-dram-wc.patch is out (see the header note)
+
+# Record pset0's successful acquisition caller for the next timeout photo.
+uke-pset-lock-owner.patch
+
+# Common xnu-12377 fixes reviewed from the latest upstream macOS work.
+upstream/xnuconfig-work-interval-counters.patch
+upstream/xnuconfig-timebase-trap-count.patch
+upstream/vmwait-vnode-pager-peek-name.patch
+upstream/kperf-static-if-builtin-args.patch
+upstream/cshash-native4k-stats.patch
+upstream/payload-boot-memory-report.patch
+upstream/payload-addon-release.patch
+upstream/cshash-native4k-parallel.patch
+upstream/cshash-native4k-lazy.patch
+upstream/payload-radix-root-at-startup.patch
+upstream/cssha-digest-time.patch
+upstream/gpupool-device-pager-close.patch
+upstream/memwired-kc-segment-release.patch
+upstream/memwired-booter-size-accounting.patch
+upstream/memwired-cs-lazy-page-chunks.patch
+upstream/vfs-union-below-walk.patch
+upstream/vmwait-dyld-pager-source-release.patch
+upstream/zzzzzzzzzzz-sheng-edge-matrix.patch
+
+# Board callsite for the shared loader-tail release routine.
+uke-addon-memory-release.patch
+
+# Opt-in outside-window VM memory and contiguous allocation diagnostics.
+upstream/window-memory-excluded-ranges.patch
+upstream/platform-error-name-address.patch
+upstream/window-outside-memory-adoption.patch
+upstream/kmem-alloc-failure-report.patch
+upstream/contig-search-report.patch
+
+# sheng c3c7468 + 20cf25d: all-user AppSync, preserving third-party process identity.
+sheng-appsync-runtime.patch
+sheng-appsync-user-trust.patch
+
+# Fixed per-CPU IRQ and interrupt-mask observations, opt-in without GPU tracing.
+uke-cpu-stall-state.patch
+
+# Bounded native PM observations for QcomDwc3Xdci with usb=1.
+# round usb24-1: uke-usb-pm-trace.patch is out (see the header note)
+
+# Explicit active contracts for native PM/root-domain and IRQ event sources.
+uke-event-sources-active.patch
+
+# Classify the prelinked USB mux socket event source as active on arm64e.
+uke-usb-socket-event-source.patch
+
+# Keep the prelinked USB request-completion work on the active chain.
+uke-usb-request-completer-active.patch
+
+# Explicit power-driver interest for Uke xHCI, root ports and downstream hub ports.
+uke-usb-xhci-pm-interest.patch
+# Retain the Uke USB2 or SuperSpeed port power vote until detach, including hubs.
+uke-usb-enumeration-power.patch
+
+# Opt-in tracing for USB HID completion messages entering DriverKit IPC.
+uke-usb-hid-rpc-trace.patch
+
+# Opt-in volume-query tracing for the Files startup failure.
+uke-files-volume-trace.patch
+# Use the existing upper-root union view for Files on iPadOS.
+uke-files-union-view.patch
+
+# Opt-in platform sleep hooks from sheng #127.
+sheng-platform-sleep.patch
