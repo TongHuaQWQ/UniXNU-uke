@@ -26,7 +26,7 @@ LCK_MTX_DECLARE(uke_apps_smmu_mutex, &uke_apps_smmu_group);
 extern "C" volatile uint32_t native_usb_stats[54];
 extern "C" uint32_t uke_ufs_dpu_map_external(unsigned slot, const uint64_t *pages, unsigned count)
     __attribute__((weak_import));
-extern "C" uint32_t native_ufs_dpu_live(unsigned reg) __attribute__((weak_import));
+extern "C" uint32_t native_ufs_dpu_live(unsigned reg);
 
 namespace {
 void sync() {__asm__ volatile("dsb sy" ::: "memory");}
