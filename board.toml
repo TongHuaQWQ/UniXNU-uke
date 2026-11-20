@@ -26,7 +26,9 @@ kit = "uke"                      # the package/ of this repository appears as ki
 [components]
 include = [
   "ArmDTPlatform", "ArmCpu", "XnuPrelink", "DarwinBoot", "AppleKeyStoreState",
-  "ArmSmmu4K", "Sm7675Platform",
+  # GopFramebuffer stays selected for its headers only (build_stage=embedded, so it needs no
+  # archive entry): UkeUsbBoard.cpp includes NativeExternalDisplay.h for the DP-AUX route.
+  "ArmSmmu4K", "Sm7675Platform", "GopFramebuffer",
   # Display, touch, input, Wi-Fi and the Adreno chain are out for this round: their archives
   # need the firmware caches and ABI observation inputs the board workflow stages, and none of
   # them is on the DWC3 path (run 44677633586 stopped in build-adreno740-kits on a missing
