@@ -46,6 +46,16 @@ OUT.mkdir(parents=True, exist_ok=True)
 KITS = ROOT / 'kits/uke'
 remoteproc = ROOT / 'kits/Sm7675Platform/remoteproc'
 llvm = Path(os.environ.get('UNIXNU_TOOLCHAIN', '/opt/unixnu-linux')) / 'llvm/bin'
+
+
+def tool(name):
+    """Resolve one LLVM tool: the pinned toolchain first, then PATH (a Homebrew runner)."""
+    pinned = llvm / name
+    if pinned.is_file():
+        return pinned
+    found = shutil.which(name)
+    require(found, f'{name}: not in {llvm} and not on PATH')
+    return Path(found)
 USB = ROOT / 'drivers/QcomDwc3'
 DISPLAY_ARCHIVE = ROOT / 'build/native-legacy-display/libNativeLegacyDisplay.late.a'
 CHECK_ONLY = '--check' in sys.argv[1:]
@@ -393,7 +403,7 @@ for name, va in sorted(usb_bindings.items()):
 for stem in ('usb-bindings', 'usb-addresses'):
     run(['xcrun', 'clang', '-target', TRIPLE, '-isysroot', sdk, '-c', USB_OUT / (stem + '.S'), '-o', USB_OUT / (stem + '.o')])
 usb_late = USB_OUT / 'QcomDwc3.late.o'
-run([llvm / 'llvm-objcopy', '--remove-section=__DATA,__mod_init_func', '--globalize-symbol=__GLOBAL__sub_I_QcomDwc3.cpp',
+run([tool('llvm-objcopy'), '--remove-section=__DATA,__mod_init_func', '--globalize-symbol=__GLOBAL__sub_I_QcomDwc3.cpp',
      USB_OUT / 'QcomDwc3.o', usb_late])
 
 objects = [usb_late, USB_OUT / 'usb-bindings.o', USB_OUT / 'usb-addresses.o', USB_OUT / 'UsbProbe.o', USB_OUT / 'UkeUsbBoard.o']
