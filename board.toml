@@ -66,8 +66,9 @@ defconfig = "uke_ipados27_defconfig"
 # shared arch series and the 24A446 profile the OS series; the SoC and device
 # series are re-based on xnu-12377 in their own repositories.
 config_fragments = ["arch:configs/common.config", "os:configs/ipados.config"]
-# The device series is the board series minus the three diagnostics that cannot compile into the
-# RELEASE comparison kernel the prelink reads (patches/xnu-12377/series-usb explains each one).
+# The device series is the board's own (patches/xnu-12377/series). The RELEASE comparison kernel
+# the prelink reads force-links no board archive, so the board hooks it would miss are declared weak
+# inside uke-usb-pm-trace.patch instead of by trimming the series.
 patch_series = ["arch:patches/xnu/series", "soc:patches/xnu-12377/series", "os:patches/xnu/series", "device:patches/xnu-12377/series"]
 # Archive builders of the kernel step, in order. They run only for a configuration with
 # CONFIG_XNU_BUILD_ARCHIVES=y (uke_ipados27_defconfig). This is the first link gate: the shared
