@@ -10,7 +10,10 @@
 # which is the USB section of scripts/build-native-legacy-display-27.py extracted whole
 # (same flags, same generated headers, same per-slot vtable verification against
 # scripts/usb-xdci-24A446.json and scripts/usb-xhci-24A446.json).
-CONFIG_XNU_KERNEL_CHAINED_FIXUPS=y
+# Chained fixups off for this round: kits/XnuPrelink/kc_image.fixups() refuses them on the
+# native side ("Chained fixup imports are not supported", run 44748418254 prelink.log), and a
+# USB-only kernel needs the prelinked kernelcache kexts more than the newer fixup format.
+# CONFIG_XNU_KERNEL_CHAINED_FIXUPS=n
 CONFIG_XNU_CRYPTO_BOOTSTRAP="source"
 CONFIG_XNU_BUILD_ARCHIVES=y
 CONFIG_XNU_ARMVIRT_PLATFORM=n
