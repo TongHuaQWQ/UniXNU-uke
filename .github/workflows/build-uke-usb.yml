@@ -115,6 +115,18 @@ jobs:
           ./unixnu build kernel -D ../UniXNU-uke
           ls -l "$UKE_OUT/kernel/"
 
+      # The comparison kernel writes its own log inside the snapshot directory; nothing uploads
+      # it by default, and its failure is the only thing that blocks prelink here.
+      - name: Show the comparison-kernel log
+        if: always()
+        run: |
+          set -x
+          OUT="${UKE_OUT:-}"
+          find "$OUT/tree/build/xnu/fileset-reference" -name '*.log' -maxdepth 3 2>/dev/null | while read -r f; do
+            echo "===== $f ====="
+            tail -80 "$f"
+          done || true
+
       - name: Report the artefacts
         if: always()
         run: |
