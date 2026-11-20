@@ -361,40 +361,40 @@ PATCH_HOOKS.write_text("""// SPDX-License-Identifier: BSD-2-Clause-Patent
 #include <stdint.h>
 
 /* uke-usb-pm-trace.patch / uke-boot-ui-trace: the flight recorder is not ported. */
-extern "C" void boot_flight_cpu_status(uint64_t[32]) {}
-extern "C" int boot_flight_worker_stack(thread_t, uint64_t *, unsigned *, uint64_t *, uint64_t[12]) { return 0; }
-extern "C" volatile uint32_t boot_log_rounds = 0;
+extern "C" __attribute__((weak)) void boot_flight_cpu_status(uint64_t[32]) {}
+extern "C" __attribute__((weak)) int boot_flight_worker_stack(thread_t, uint64_t *, unsigned *, uint64_t *, uint64_t[12]) { return 0; }
+extern "C" __attribute__((weak)) volatile uint32_t boot_log_rounds = 0;
 
 /* zzzz-sheng-ipados27-bringup.patch: MACF grants and ignition. */
-extern "C" boolean_t native_adreno_connect_granted(io_object_t) { return 0; }
-extern "C" boolean_t native_kobj_map_grant(ipc_port_t, mach_msg_id_t) { return 0; }
-extern "C" int sheng_boot_watchdog_policy(void *, uint64_t) { return 0; }
-extern "C" bool sheng_sigp_recover(void *) { return false; }
+extern "C" __attribute__((weak)) boolean_t native_adreno_connect_granted(io_object_t) { return 0; }
+extern "C" __attribute__((weak)) boolean_t native_kobj_map_grant(ipc_port_t, mach_msg_id_t) { return 0; }
+extern "C" __attribute__((weak)) int sheng_boot_watchdog_policy(void *, uint64_t) { return 0; }
+extern "C" __attribute__((weak)) bool sheng_sigp_recover(void *) { return false; }
 
 /* uke-ignition-* / uke-cpu-stall-state / uke-files-*: diagnostics of other subsystems. */
-extern "C" void uke_ignition_wait_trace(unsigned, uint64_t) {}
-extern "C" bool uke_ignition_trace = false;
-extern "C" unsigned int uke_cpu_stall_enabled = 0;
-extern "C" bool uke_files_volume_trace_take(void *) { return false; }
-extern "C" void *uke_files_union_identity(void *mp) { return mp; }
-extern "C" bool uke_outside_dram_contains(uint64_t, uint64_t) { return false; }
-extern "C" uint64_t native_timebase_trap_total(void) { return 0; }
+extern "C" __attribute__((weak)) void uke_ignition_wait_trace(unsigned, uint64_t) {}
+extern "C" __attribute__((weak)) bool uke_ignition_trace = false;
+extern "C" __attribute__((weak)) unsigned int uke_cpu_stall_enabled = 0;
+extern "C" __attribute__((weak)) bool uke_files_volume_trace_take(void *) { return false; }
+extern "C" __attribute__((weak)) void *uke_files_union_identity(void *mp) { return mp; }
+extern "C" __attribute__((weak)) bool uke_outside_dram_contains(uint64_t, uint64_t) { return false; }
+extern "C" __attribute__((weak)) uint64_t native_timebase_trap_total(void) { return 0; }
 
 /* uke-gpu-prepare-outside-iokit.patch: the Adreno client grants. */
-extern "C" void *native_adreno_prepare_external(IOUserClient *, uint32_t,
+extern "C" __attribute__((weak)) void *native_adreno_prepare_external(IOUserClient *, uint32_t,
                                                 const IOExternalMethodArguments *) { return nullptr; }
 /* The DP desktop path UkeUsbBoard carries: no DPU mapping, so it reports "unavailable". */
-extern "C" uint32_t native_ufs_dpu_live(unsigned) { return ~0u; }
-extern "C" uint32_t uke_ufs_dpu_map_external(unsigned, const uint64_t *, unsigned) { return 0; }
-extern "C" void native_adreno_finish_external(IOService *, uint32_t) {}
-extern "C" uint32_t native_adreno_preflight_ready = 0;
-extern "C" void *native_user_pt_attr = nullptr;
+extern "C" __attribute__((weak)) uint32_t native_ufs_dpu_live(unsigned) { return ~0u; }
+extern "C" __attribute__((weak)) uint32_t uke_ufs_dpu_map_external(unsigned, const uint64_t *, unsigned) { return 0; }
+extern "C" __attribute__((weak)) void native_adreno_finish_external(IOService *, uint32_t) {}
+extern "C" __attribute__((weak)) uint32_t native_adreno_preflight_ready = 0;
+extern "C" __attribute__((weak)) void *native_user_pt_attr = nullptr;
 
 /* source-storage-runtime.patch */
-extern "C" void native_source_storage_start(void) {}
+extern "C" __attribute__((weak)) void native_source_storage_start(void) {}
 
 /* uke-display-call-trace.patch */
-extern "C" void native_legacy_method_trace(IOUserClient *, uint32_t, const IOExternalMethodArguments *,
+extern "C" __attribute__((weak)) void native_legacy_method_trace(IOUserClient *, uint32_t, const IOExternalMethodArguments *,
                                            uint32_t, unsigned) {}
 """)
 compile_cpp(PATCH_HOOKS, USB_OUT / 'UsbPatchHooks.o', usb_flags)
