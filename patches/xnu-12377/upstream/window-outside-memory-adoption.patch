@@ -576,7 +576,7 @@ diff --color -ruN a/osfmk/arm64/machine_routines.c b/osfmk/arm64/machine_routine
 diff --color -ruN a/osfmk/arm64/sleh.c b/osfmk/arm64/sleh.c
 --- a/osfmk/arm64/sleh.c	2026-11-11 06:37:49
 +++ b/osfmk/arm64/sleh.c	2026-11-11 13:50:42
-@@ -606,6 +606,25 @@
+@@ -606,6 +606,27 @@
  	kernel_integrity_error_handler(esr, far);
  #endif
  
