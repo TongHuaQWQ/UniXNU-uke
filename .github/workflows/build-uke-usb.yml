@@ -92,15 +92,37 @@ jobs:
         working-directory: UniXNU
         run: ./unixnu ipsw fetch -D ../UniXNU-uke
 
-      - name: Select the configuration and locate the output tree
+      - name: Select the configuration, assemble the tree, locate the output
         working-directory: UniXNU
         run: |
           set -x
           ./unixnu defconfig "$UKE_DEFCONFIG" -D ../UniXNU-uke
+          ./unixnu tree -D ../UniXNU-uke
           OUT=$(./unixnu status --json -D ../UniXNU-uke | python3 -c 'import json,sys;print(json.load(sys.stdin)["output"])')
           echo "UKE_OUT=$OUT" >> "$GITHUB_ENV"
           echo "output tree: $OUT"
           grep -E 'XNU_BUILD_ARCHIVES|XNU_EXTRA_LD_ARCHIVES|NATIVE_LEGACY_DISPLAY|NATIVE_ADRENO' "$OUT/.config"
+
+      # emit_prelink.py needs a symbol-bearing RELEASE comparison kernel, and
+      # scripts/build-fileset-release-reference.py force-links corecrypto, libpthread, ArmDTPlatform
+      # and ArmCpu only — never a board archive. The board's PM trace patch defines
+      # uke_usb_pm_snapshot inside a block the RELEASE build does not compile while one of its call
+      # sites does, so that link reports it undefined (run 44733757616). Give the prepared tree the
+      # DEVELOPMENT-otherwise definition; idempotent, and the shipping kernel is untouched because a
+      # DEVELOPMENT build never sees this branch.
+      - name: Give the comparison kernel its RELEASE-only board hooks
+        working-directory: UniXNU
+        run: |
+          set -x
+          f="$UKE_OUT/tree/.cache/xnu-work/iokit/Kernel/IOServicePM.cpp"
+          test -f "$f" || { echo "::error::no prepared xnu tree at $f"; exit 1; }
+          if grep -q 'uke_usb_pm_snapshot(IOService \*service) { (void)service; }' "$f"; then
+            echo "hook already present"
+          else
+            printf '\n#if !(DEVELOPMENT || DEBUG)\nextern "C" void uke_usb_pm_snapshot(IOService *service) { (void)service; }\n#endif\n' >> "$f"
+            echo "hook appended"
+          fi
+          tail -5 "$f"
 
       # One step, the driver's own sequence: compile records -> the board archive list
       # (build-uke-usb.py, then the RELEASE comparison kernel that build/release-reference names)
