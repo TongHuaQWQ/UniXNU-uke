@@ -102,32 +102,18 @@ jobs:
           echo "output tree: $OUT"
           grep -E 'XNU_BUILD_ARCHIVES|XNU_EXTRA_LD_ARCHIVES|NATIVE_LEGACY_DISPLAY|NATIVE_ADRENO' "$OUT/.config"
 
-      - name: Pass 1 — compile records and the board archives
-        working-directory: UniXNU
-        # The records pass links before any archive exists, which this board's patches
-        # cannot satisfy (they call uke_boot_stage and friends); the driver says so and
-        # carries on to the archive list, so a stop here is not a verdict. The target
-        # link in pass 3 is the one that must succeed.
-        run: |
-          set -x
-          ./unixnu build kernel --skip-prelink -D ../UniXNU-uke \
-            || echo "::warning::pass 1 stopped (expected: records link before the archives exist)"
-
-      - name: Build the comparison kernel prelink reads
-        working-directory: UniXNU
-        run: |
-          set -x
-          test -d "$UKE_OUT/tree" || { echo "::error::no target tree at $UKE_OUT/tree"; exit 1; }
-          ( cd "$UKE_OUT/tree" && python3 scripts/build-fileset-release-reference.py --tree . )
-          ls -l "$UKE_OUT/tree/build/xnu/fileset-reference/"
-
-      - name: Pass 2 — link and prelink the kernel
+      # One step, the driver's own sequence: compile records -> the board archive list
+      # (build-uke-usb.py, then the RELEASE comparison kernel that build/release-reference names)
+      # -> link -> prelink. The records pass links before any archive exists and cannot satisfy the
+      # board patches' boot-stage hooks; the driver says so and carries on, so tolerate only that.
+      - name: Build and prelink the kernel
         working-directory: UniXNU
         env:
           MAKEFLAGS: -k
         run: |
           set -x
           ./unixnu build kernel -D ../UniXNU-uke
+          ls -l "$UKE_OUT/kernel/"
 
       - name: Report the artefacts
         if: always()

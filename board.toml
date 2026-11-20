@@ -86,7 +86,11 @@ archives = [
   # The USB device stack, extracted from build-native-legacy-display-27.py so the display,
   # touch and Adreno inputs that builder needs are not a prerequisite for USB.
   "build-uke-usb.py",
-  # Match the stripped Apple kernel against the real upstream RELEASE/LTO reference.
+  # Match the stripped Apple kernel against the real upstream RELEASE/LTO reference. The profile
+  # points emit_prelink at build/xnu/fileset-reference (--fileset-reference) and nothing else builds
+  # it, so it is the last archive entry here: the driver runs the list immediately before prelink.
+  # Upstream's 27 boards carry the same final entry (docs/devices/sheng.md).
+  "build-fileset-release-reference.py --tree .",
 ]
 
 # Adreno 732 (uke) board values for the native GPU driver. The driver carries

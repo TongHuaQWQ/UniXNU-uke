@@ -354,9 +354,17 @@ PATCH_HOOKS.write_text("""// SPDX-License-Identifier: BSD-2-Clause-Patent
 // a definition. These are the no-driver answers for a kernel without the storage and display
 // tracks: storage does not start, and there is no display call trace to record.
 #include <IOKit/IOUserClient.h>
+#include <stdint.h>
 extern "C" void native_source_storage_start(void) {}
 extern "C" void native_legacy_method_trace(IOUserClient *, uint32_t, const IOExternalMethodArguments *,
                                            uint32_t, unsigned) {}
+// The DP desktop path and the Adreno/DPU probes reach into the display, GPU and storage
+// tracks. UkeUsbBoard declares the last two weak_import but a forced-export link (the RELEASE
+// comparison kernel) still wants them; all three answer "that driver is not running".
+extern "C" void *native_adreno_prepare_external(IOUserClient *, uint32_t,
+                                                const IOExternalMethodArguments *) { return nullptr; }
+extern "C" uint32_t native_ufs_dpu_live(unsigned) { return ~0u; }
+extern "C" uint32_t uke_ufs_dpu_map_external(unsigned, const uint64_t *, unsigned) { return 0; }
 """)
 compile_cpp(PATCH_HOOKS, USB_OUT / 'UsbPatchHooks.o', usb_flags)
 board_objects.append(USB_OUT / 'UsbPatchHooks.o')
