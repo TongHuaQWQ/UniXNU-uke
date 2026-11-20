@@ -325,7 +325,7 @@ index cd18d0d..37d4222 100644
  		if (!done) {
  			break; // PM state machine blocked
  		}
-@@ -9620,3 +9753,101 @@ IOServicePM::pmTrace(
+@@ -9620,3 +9753,115 @@ IOServicePM::pmTrace(
  	IOTimeStampConstant(IODBG_POWER(event) | eventFunc, nameAsArg, (uintptr_t)Owner->getRegistryEntryID(), (uintptr_t)(OBFUSCATE(param1)), (uintptr_t)(OBFUSCATE(param2)));
  #endif
  }
@@ -426,6 +426,20 @@ index cd18d0d..37d4222 100644
 +		}
 +	}
 +	IOLog("[usb pm] snapshot end\n");
++}
++
++/*
++ * Weak fallbacks for board hooks the rest of this series calls. A RELEASE comparison build
++ * (scripts/build-fileset-release-reference.py, which emit_prelink reads) force-links only
++ * corecrypto, libpthread, ArmDTPlatform and ArmCpu, never the board archives, so these would be
++ * undefined in it. Weak, so the archive definitions win in every shipping kernel.
++ */
++extern "C" __attribute__((weak)) void uke_boot_stage(const char *text) { (void)text; }
++extern "C" __attribute__((weak)) void uke_boot_stage_unbind(void) {}
++extern "C" __attribute__((weak)) void uke_boot_stage_bind(uintptr_t frame, unsigned width,
++    unsigned height, unsigned stride, unsigned depth)
++{
++	(void)frame; (void)width; (void)height; (void)stride; (void)depth;
 +}
 diff --git a/iokit/Kernel/IOServicePMPrivate.h b/iokit/Kernel/IOServicePMPrivate.h
 index 5dd3886..a81dd5e 100644
