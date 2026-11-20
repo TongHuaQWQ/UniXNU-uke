@@ -1,0 +1,159 @@
+name: build-uke-usb
+
+# One job, one question: build the USB-only kernel of the 24A446 line and upload it.
+#
+# Why this workflow exists (the board's own build-kernel.yml cannot do it):
+#   * its `kernel` job hardcodes uke_defconfig and its `full` job runs a bootstrap
+#     step that is fatal on this tree, so the dispatched defconfig never reaches a
+#     link (runs 44684225573 and earlier all stopped inside step 12);
+#   * `unixnu build kernel` already does bootstrap -> archives -> link -> prelink for
+#     a configuration that sets CONFIG_XNU_BUILD_ARCHIVES, which uke_usb_defconfig
+#     does, so the manual staging their workflow performs is unnecessary here.
+#
+# The prelink also needs the symbol-bearing comparison kernel the 24A446 profile names
+# (extra_args --fileset-reference), and the board's archive list does not build it, so
+# this workflow builds it explicitly between the two passes, exactly as the macOS line
+# of this project does.
+#
+# Dispatch: Actions -> build-uke-usb -> Run workflow. Artifact: uke-usb-kernel.
+
+on:
+  workflow_dispatch:
+    inputs:
+      defconfig:
+        description: 'Device defconfig to build'
+        required: true
+        default: 'uke_usb_defconfig'
+      core_repository:
+        description: 'Core UniXNU repository (owner/name)'
+        required: true
+        default: 'Allenwdk/UniXNU'
+      core_ref:
+        description: 'Core UniXNU ref: the only branch with profiles/os/ipados-27.0.1-24A446'
+        required: true
+        default: 'main'
+
+permissions:
+  contents: read
+
+jobs:
+  kernel:
+    runs-on: macos-latest
+    timeout-minutes: 240
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: 1
+      HOMEBREW_NO_INSTALL_CLEANUP: 1
+      UKE_DEFCONFIG: ${{ inputs.defconfig }}
+      UKE_CORE_REPO: ${{ inputs.core_repository }}
+      UKE_CORE_REF: ${{ inputs.core_ref }}
+    steps:
+      - name: Diagnose the request
+        run: |
+          echo "defconfig=$UKE_DEFCONFIG core=$UKE_CORE_REPO@$UKE_CORE_REF"
+          sw_vers
+          uname -m
+
+      - name: Check out the device repository
+        uses: actions/checkout@v4
+        with:
+          path: UniXNU-uke
+
+      - name: Check out UniXNU
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.UKE_CORE_REPO }}
+          ref: ${{ env.UKE_CORE_REF }}
+          path: UniXNU
+
+      - name: Record the revisions
+        run: |
+          echo "device $(git -C UniXNU-uke rev-parse HEAD)"
+          echo "core   $(git -C UniXNU rev-parse HEAD)"
+
+      - name: Install the host tools
+        run: |
+          brew install cmake ninja unifdef llvm mtools dtc
+          echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
+          echo "$(brew --prefix unifdef)/bin" >> "$GITHUB_PATH"
+
+      - name: Verify the tools unixnu checks for
+        run: |
+          for tool in git make clang cmake ninja unifdef mtools dtc xcodebuild; do
+            printf '%-10s %s\n' "$tool" "$(command -v "$tool" || echo MISSING)"
+          done
+
+      - name: Fetch the Apple references
+        working-directory: UniXNU
+        run: |
+          ./unixnu fetch xnu libplatform libdispatch AvailabilityVersions libpthread \
+                          corecrypto-2023 IOStorageFamily IOHIDFamily -D ../UniXNU-uke
+
+      - name: Fetch the target IPSW members
+        working-directory: UniXNU
+        run: ./unixnu ipsw fetch -D ../UniXNU-uke
+
+      - name: Select the configuration and locate the output tree
+        working-directory: UniXNU
+        run: |
+          set -x
+          ./unixnu defconfig "$UKE_DEFCONFIG" -D ../UniXNU-uke
+          OUT=$(./unixnu status --json -D ../UniXNU-uke | python3 -c 'import json,sys;print(json.load(sys.stdin)["output"])')
+          echo "UKE_OUT=$OUT" >> "$GITHUB_ENV"
+          echo "output tree: $OUT"
+          grep -E 'XNU_BUILD_ARCHIVES|XNU_EXTRA_LD_ARCHIVES|NATIVE_LEGACY_DISPLAY|NATIVE_ADRENO' "$OUT/.config"
+
+      - name: Pass 1 — compile records and the board archives
+        working-directory: UniXNU
+        # The records pass links before any archive exists, which this board's patches
+        # cannot satisfy (they call uke_boot_stage and friends); the driver says so and
+        # carries on to the archive list, so a stop here is not a verdict. The target
+        # link in pass 3 is the one that must succeed.
+        run: |
+          set -x
+          ./unixnu build kernel --skip-prelink -D ../UniXNU-uke \
+            || echo "::warning::pass 1 stopped (expected: records link before the archives exist)"
+
+      - name: Build the comparison kernel prelink reads
+        working-directory: UniXNU
+        run: |
+          set -x
+          test -d "$UKE_OUT/tree" || { echo "::error::no target tree at $UKE_OUT/tree"; exit 1; }
+          ( cd "$UKE_OUT/tree" && python3 scripts/build-fileset-release-reference.py --tree . )
+          ls -l "$UKE_OUT/tree/build/xnu/fileset-reference/"
+
+      - name: Pass 2 — link and prelink the kernel
+        working-directory: UniXNU
+        env:
+          MAKEFLAGS: -k
+        run: |
+          set -x
+          ./unixnu build kernel -D ../UniXNU-uke
+
+      - name: Report the artefacts
+        if: always()
+        run: |
+          set -x
+          mkdir -p artifacts
+          OUT="${UKE_OUT:-}"
+          if [ -n "$OUT" ] && [ -f "$OUT/kernel/kernel.macho" ]; then
+            cp "$OUT/kernel/kernel.macho" artifacts/
+            cp "$OUT/kernel/kernel.json" artifacts/ 2>/dev/null || true
+            shasum -a 256 "$OUT/kernel/kernel.macho" | tee artifacts/kernel.macho.sha256
+            echo "USB symbols:" 
+            llvm-nm --defined-only artifacts/kernel.macho 2>/dev/null | grep -E 'QcomDwc3Xdci|QcomDwc3Xhci|qcom_dwc3_bring_up|qcom_dwc3_publish|native_usb_stats' || echo "NONE FOUND"
+            ls -l "$OUT/tree/build/uke-usb/" 2>/dev/null || true
+            cat "$OUT/tree/build/uke-usb/build-report.json" 2>/dev/null | head -40 || true
+          else
+            echo "kernel.macho was not produced" | tee artifacts/MISSING.txt
+          fi
+          cp -r "$OUT/logs" artifacts/logs 2>/dev/null || true
+          mkdir -p artifacts/uke-usb
+          cp "$OUT/tree/build/uke-usb/"* artifacts/uke-usb/ 2>/dev/null || true
+          ls -l artifacts
+
+      - name: Upload the kernel
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uke-usb-kernel
+          path: artifacts/
