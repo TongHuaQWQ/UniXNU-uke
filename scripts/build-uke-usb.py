@@ -245,9 +245,9 @@ xhci_header = '''// Generated from the reviewed AppleUSBXHCI fixture; opaque pri
 '''
 for slot, macro in xhci_names.items():
     xhci_header += f'#define {macro} {xhci_methods[slot]["name"]}\n'
-xhci_header += '''class AppleUSBXHCI : public IOService {{
+xhci_header += f'''class AppleUSBXHCI : public IOService {{
  OSDeclareAbstractStructors(AppleUSBXHCI)
- unsigned char originalPrivate[{instance_size}-sizeof(IOService)];
+ unsigned char originalPrivate[{xhci_abi['instance_size']}-sizeof(IOService)];
 public:
  void free() override;
  bool init(OSDictionary *properties=nullptr) override;
@@ -273,7 +273,7 @@ public:
  unsigned long initialPowerStateForDomainState(IOPMPowerFlags) override;
  IOReturn powerStateWillChangeTo(IOPMPowerFlags,unsigned long,IOService *) override;
  IOReturn powerStateDidChangeTo(IOPMPowerFlags,unsigned long,IOService *) override;
-'''.replace('{instance_size}', str(xhci_abi['instance_size']))
+'''
 for i in range(xhci_abi.get('base_slots', 168), len(xhci_slots)):
     m = xhci_methods[i]
     xhci_header += f' virtual {m["returns"]} {m["name"]}({m["parameters"]});\n'
