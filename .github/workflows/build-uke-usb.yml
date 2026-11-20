@@ -110,6 +110,17 @@ jobs:
       # sites does, so that link reports it undefined (run 44733757616). Give the prepared tree the
       # DEVELOPMENT-otherwise definition; idempotent, and the shipping kernel is untouched because a
       # DEVELOPMENT build never sees this branch.
+      - name: Pass 1 — prepare the tree, compile records, board archives
+        working-directory: UniXNU
+        # The records pass links before any board archive exists and cannot satisfy the board
+        # patches' hooks; the driver reports that and carries on to the archive list. The archive
+        # list ends with the comparison kernel, which fails until the hook below is in the tree, so
+        # a stop here is expected and pass 2 is the verdict.
+        run: |
+          set -x
+          ./unixnu build kernel --skip-prelink -D ../UniXNU-uke \
+            || echo "::warning::pass 1 stopped (expected: records link and comparison kernel before the hook)"
+
       - name: Give the comparison kernel its RELEASE-only board hooks
         working-directory: UniXNU
         run: |
@@ -128,7 +139,7 @@ jobs:
       # (build-uke-usb.py, then the RELEASE comparison kernel that build/release-reference names)
       # -> link -> prelink. The records pass links before any archive exists and cannot satisfy the
       # board patches' boot-stage hooks; the driver says so and carries on, so tolerate only that.
-      - name: Build and prelink the kernel
+      - name: Pass 2 — link and prelink the kernel
         working-directory: UniXNU
         env:
           MAKEFLAGS: -k
