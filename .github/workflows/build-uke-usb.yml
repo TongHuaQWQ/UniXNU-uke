@@ -127,7 +127,7 @@ jobs:
         # scripts/build-fileset-release-reference.py force-links corecrypto, libpthread, ArmDTPlatform
         # and ArmCpu only — never a board archive. The board patches call these four from
         # arm_init/arm_vm_init and IOServicePM, so the comparison link reports them undefined. Weak,
-        # so the archive definitions win in the shipping kernel; the PM snapshot is guarded because
+        # so the archive definitions win in the shipping kernel.
         # the board's own definition only exists in DEVELOPMENT.
         run: |
           set -x
@@ -143,9 +143,8 @@ jobs:
               printf 'extern "C" __attribute__((weak)) void uke_boot_stage_bind(uintptr_t frame, unsigned width,\n'
               printf '    unsigned height, unsigned stride, unsigned depth)\n'
               printf '{ (void)frame; (void)width; (void)height; (void)stride; (void)depth; }\n'
-              printf '#if !(DEVELOPMENT || DEBUG)\n'
-              printf 'extern "C" void uke_usb_pm_snapshot(IOService *service) { (void)service; }\n'
-              printf '#endif\n'
+              printf '/* uke_usb_pm_snapshot is defined by the board patch in this same file (it is not\n'
+              printf ' * guard-limited: run 44735139274 saw a redefinition when this step also defined it). */\n'
             } >> "$f"
             echo "hooks appended"
           fi
