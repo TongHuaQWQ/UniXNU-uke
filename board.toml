@@ -28,7 +28,12 @@ include = [
   "ArmDTPlatform", "ArmCpu", "XnuPrelink", "DarwinBoot", "AppleKeyStoreState",
   "Adreno740", "AdrenoMetal", "AdrenoFirmware", "AdrenoPM4", "ArmSmmu4K", "AirNir", "Sm7675Platform",
   "GopFramebuffer", "QcomGeniSpi", "ShengNovatekTouch", "ShengHidInput",
-  "ShengUfs", "VirtioMmioBlock", "RamBlock", "VerifiedRoot", "SoftwareAES", "Ath12kWifi", "QcomDwc3",
+  # Storage chain (ShengUfs, VirtioMmioBlock, RamBlock, VerifiedRoot) is out for this round: the
+  # ShengUfs kernel recipe runs scripts/build-sheng-source-storage.py, which refuses to build
+  # without the signed ipados-27.0.1-24A446 root policies (run 44675246333: "incomplete signed
+  # root-policy inputs ... OS/manifest.bin, OS/trusted-key.bin, OS/verification.json, ...").
+  # The DWC3 bring-up and the Apple USB device stack do not touch storage.
+  "SoftwareAES", "Ath12kWifi", "QcomDwc3",
 ]
 
 # The target OS image comes from the `ipados-27.0.1-24A446` profile (iPad17,3 / J820AP,
@@ -72,9 +77,7 @@ archives = [
   "component:SoftwareAES",
   "build-software-aes-27.py",
   # Source storage: ShengUfs against the public IOStorageFamily, the Data RAM block and the verify target.
-  "component:VirtioMmioBlock",
-  "component:ShengUfs",
-  "component:RamBlock",
+  # "component:VirtioMmioBlock", "component:ShengUfs", "component:RamBlock" — see [components].
   # Compile the source HID adapter before binding it to the original 24A446 IOHIDDevice.
   "component:ShengHidInput",
   # Upstream fixed-address display/HID adapters are relocated by XnuPrelink.
