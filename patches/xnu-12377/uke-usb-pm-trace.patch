@@ -2,7 +2,7 @@ diff --git a/iokit/Kernel/IOServicePM.cpp b/iokit/Kernel/IOServicePM.cpp
 index cd18d0d..37d4222 100644
 --- a/iokit/Kernel/IOServicePM.cpp
 +++ b/iokit/Kernel/IOServicePM.cpp
-@@ -70,6 +70,37 @@ static void tellKernelClientApplier(OSObject * object, void * arg);
+@@ -70,6 +70,44 @@ static void tellKernelClientApplier(OSObject * object, void * arg);
  static void tellAppClientApplier(OSObject * object, void * arg);
  static const char * getNotificationPhaseString(uint32_t phase);
  
@@ -38,6 +38,13 @@ index cd18d0d..37d4222 100644
 +/* The comparison kernel emit_prelink reads is RELEASE (scripts/build-fileset-release-reference.py);
 + * this TU's diagnostic definition at the end of the file is not part of that build, so the RELEASE
 + * link needs this answer. DEVELOPMENT keeps the real tracing implementation. */
++extern "C" void uke_usb_pm_snapshot(IOService *service) { (void)service; }
++#endif
++
++#if !(DEVELOPMENT || DEBUG)
++/* The comparison kernel emit_prelink reads is RELEASE (scripts/build-fileset-release-reference.py);
++ * this TU's diagnostic definition at the end of the file is not part of that build, so RELEASE
++ * needs an answer here. DEVELOPMENT keeps the real tracing implementation. */
 +extern "C" void uke_usb_pm_snapshot(IOService *service) { (void)service; }
 +#endif
 @@ -1162,23 +1186,41 @@ IOService::registerPowerDriver(
